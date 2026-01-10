@@ -1,19 +1,25 @@
 #ifndef WEBSOCKET_H
 #define WEBSOCKET_H
 
-#include <stdlib.h>
-#include <openssl/ssl.h>
-#include <pthread.h>
+#include "https_socket.h"
 
+/*
+ * Structure representing a WebSocket connection.
+ *
+ * This structure is a wrapper for the underlying https_socket,
+ * and exists to prevent passing an upgraded socket to https functions.
+ */
 struct websocket{
-    int socket_fd;
-    SSL_CTX* ctx;
-    SSL* ssl;
-    pthread_t heartbeat_thread;
-    pthread_mutex_t send_mutex;
-    int heartbeat_interval_ms;
+    struct https_socket https_sock;
 };
 
+/*
+* Represents a received WebSocket message.
+* 
+* opcode: The WebSocket opcode (e.g., 1 for text, 2 for binary).
+* payload: The message payload as a null-terminated string.
+* payload_len: The length of the payload in bytes.
+*/
 struct ws_message{
     int opcode;
     char* payload;
@@ -21,48 +27,55 @@ struct ws_message{
 };
 
 /*
- * Establishes a TCP connection to the WebSocket server.
+ * Establishes a TCP/TLS socket connection.
+ * Then performs the WebSocket upgrade handshake.
+ * Closes the socket on failure.
+ * 
+ * This function takes an addrinfo list obtained from https_dns_lookup,
+ * allowing the caller to control the lifetime of the addrinfo list.
+ * 
  * Returns 0 on success, 1 on failure.
  */
-int ws_tcp_connect(struct websocket* ws);
+int ws_connect_addrinfo(struct websocket* ws, struct addrinfo* addr_list);
 
 /*
- * Establishes a TLS connection over the existing TCP connection.
+ * Establishes a TCP/TLS socket connection.
+ * Then performs the WebSocket upgrade handshake.
  * Closes the TCP socket on failure.
+ * 
+ * This function performs the DNS lookup internally.
+ * 
  * Returns 0 on success, 1 on failure.
  */
-int ws_tls_connect(struct websocket* ws);
+int ws_connect(struct websocket* ws, const char* hostname, const char* port);
 
 /*
- * Performs the WebSocket handshake over the established TLS connection.
- * Closes the TLS connection and TCP socket on failure.
- * Returns 0 on success, 1 on failure.
- */
-int ws_handshake(struct websocket* ws);
-
-/*
- * Send a text websocket frame (opcode 1) with the given message.
+ * Sends a text websocket frame (opcode 1) with the given message.
+ * Accepts messages up to 4096 bytes in length, including the null terminator.
+ * This is a self imposed limit, as the WebSocket protocol supports much larger messages.
+ * However, the discord gateway has a single frame limit of 4096 bytes.
+ *
  * Returns 0 on success, 1 on failure.
  */
 int ws_send_text(struct websocket* ws, const char* message);
 
-int ws_start_heartbeat(struct websocket* ws, int interval_ms);
-
 /*
  * Receives a websocket frame and returns the payload as a null-terminated string.
  * The caller is responsible for freeing the returned string.
- * Returns NULL on failure or if a close frame is received.
+ * 
+ * Returns NULL if a close frame is received, or if reading fails.
  */
 struct ws_message* ws_receive(struct websocket* ws);
 
 /*
+ * Sends a WebSocket close frame (opcode 8) to the server.
  * Closes the TLS connection and TCP socket.
  */
 void ws_close(struct websocket* ws);
 
 /*
  * Frees a ws_message structure.
- * Also frees member payload.
+ * Also frees the member payload.
  */
 void ws_free_message(struct ws_message* msg);
 

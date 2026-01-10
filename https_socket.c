@@ -1,59 +1,69 @@
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200112L
-#include "https_socket.h"
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <stdio.h>
 
+#include "https_socket.h"
+
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+// Global SSL context used for all https_socket connections.
 static SSL_CTX* ssl_ctx = NULL;
 
-int https_ctx_init(){
-    if(ssl_ctx)
-        return 0;
-    SSL_library_init();
-    SSL_load_error_strings();
-    OpenSSL_add_all_algorithms();
-    ssl_ctx = SSL_CTX_new(TLS_client_method());
-    if(ssl_ctx)
-        return 0;
-    fprintf(stderr, "Failed to initialize SSL context\n");
-    return 1;
-}
-
-int https_tcp_connect(struct https_socket* sock, const char* hostname, const char* port){
+/*
+ * Static helper function for establishing a TCP connection
+ * Does not free the addrinfo list.
+ * Sets the https_socket hostname to the canonical name of the first address in the list.
+ * 
+ * Returns 0 on success, 1 on failure.
+ */
+static int https_tcp_connect_addrinfo(struct https_socket* sock, struct addrinfo* addr_list){
+    if(!addr_list){
+        fprintf(stderr, "Address info is NULL\n");
+        return 1;
+    }
     sock->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(sock->socket_fd == -1){
         fprintf(stderr, "Failed to create socket\n");
         return 1;
     }
-    struct addrinfo* addr_list = NULL;
-    struct addrinfo hints = {0};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = 0;
-    int result = getaddrinfo(hostname, port, &hints, &addr_list);
-    if(result != 0){
-        fprintf(stderr, "Failed to get address info\n");
-        return 1;
-    }
     struct addrinfo* ptr = addr_list;
+    sock->hostname = strdup(ptr->ai_canonname);
     while(ptr != NULL){
         int connection_result = connect(sock->socket_fd, ptr->ai_addr, ptr->ai_addrlen);
-        if(connection_result == 0){
-            sock->hostname = hostname;
-            freeaddrinfo(addr_list);
+        if(connection_result == 0)
             return 0;
-        }
         ptr = ptr->ai_next;
     }
-    fprintf(stderr, "Failed to connect to any address\n");
-    freeaddrinfo(addr_list);
+    fprintf(stderr, "Failed to connect to address\n");
     close(sock->socket_fd);
     return 1;
 }
 
-int https_tls_connect(struct https_socket* sock){
+/*
+ * Static helper function for establishing a TCP connection
+ * Performs the DNS lookup for the given hostname.
+ * Then connects the socket and frees the addrinfo list.
+ * 
+ * Returns 0 on success, 1 on failure.
+ */
+static int https_tcp_connect(struct https_socket* sock, const char* hostname, const char* port){
+    struct addrinfo* addr_list = https_dns_lookup(hostname, port);
+    int connect_result = https_tcp_connect_addrinfo(sock, addr_list);
+    freeaddrinfo(addr_list);
+    return connect_result;
+}
+
+/*
+ * Static helper function for establishing a TLS connection over an existing TCP socket.
+ * Closes the TCP socket on failure.
+ * 
+ * Returns 0 on success, 1 on failure.
+ */
+static int https_tls_connect(struct https_socket* sock){
     sock->ssl = SSL_new(ssl_ctx);
     if(!sock->ssl){
         fprintf(stderr, "Failed to create SSL structure\n");
@@ -70,12 +80,71 @@ int https_tls_connect(struct https_socket* sock){
     return 0;
 }
 
+
+
+int https_ctx_init(){
+    if(ssl_ctx)
+        return 0;
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+    ssl_ctx = SSL_CTX_new(TLS_client_method());
+    if(ssl_ctx)
+        return 0;
+    fprintf(stderr, "Failed to initialize SSL context\n");
+    return 1;
+}
+
+
+
+struct addrinfo* https_dns_lookup(const char* hostname, const char* port){
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_CANONNAME;
+    hints.ai_protocol = 0;
+    int result = getaddrinfo(hostname, port, &hints, &addr_list);
+    if(result != 0){
+        fprintf(stderr, "Failed to get address info\n");
+        return NULL;
+    }
+    return addr_list;
+}
+
+
+
+int https_connect_addrinfo(struct https_socket* sock, struct addrinfo* addr_list){
+    if(https_tcp_connect_addrinfo(sock, addr_list))
+        return 1;
+    if(https_tls_connect(sock))
+        return 1;
+    return 0;
+}
+
+
+
+int https_connect(struct https_socket* sock, const char* hostname, const char* port){
+    if(https_tcp_connect(sock, hostname, port))
+        return 1;
+    if(https_tls_connect(sock))
+        return 1;
+    return 0;
+}
+
+
+
 char* https_send(struct https_socket* sock, const char* data){
+    /*
+     * This function is ridiculously long and I barely understand what I have created here.
+     * I do not think it is robust, and is probably susceptible to a buffer overflow.
+     * I will have to rewrite it later.
+     */
     if(SSL_write(sock->ssl, data, strlen(data)) <= 0){
         fprintf(stderr, "Failed to send request\n");
         return NULL;
     }
-    //8KiB 8192
+    //8KiB = 8192
     char buffer[64 * 8192];
     int buffer_size = 0;
     char* header_end = NULL;
@@ -122,13 +191,11 @@ char* https_send(struct https_socket* sock, const char* data){
                 response[r_i] = '\0';
                 break;
             }
-            char* chunk_start = strstr(header_end, "\r\n")+2;
-            for(int i = 0; i < jump; i++){
-                response[r_i++] = chunk_start[i];
-            }
-            curr = chunk_start + jump + 4;
+            char* chunk_start = strstr(curr, "\r\n")+2;
+            memcpy(response + r_i, chunk_start, jump);
+            r_i += jump;
+            curr = chunk_start + jump + 2;
         }
-        printf("%s", response);
         return response;
     }else{
         char* content_length_str = strstr(buffer, "Content-Length: ");
@@ -138,7 +205,7 @@ char* https_send(struct https_socket* sock, const char* data){
                 return NULL;
             }
             content_length_str += 16;
-            int content_length = (int)strtol(content_length_str, NULL, 16);
+            int content_length = (int)strtol(content_length_str, NULL, 10);
             size_t received_body_len = buffer_size - (header_end - buffer);
             while(received_body_len < (size_t)content_length){
                 if(buffer_size + 8192 >= 524288){
@@ -163,6 +230,8 @@ char* https_send(struct https_socket* sock, const char* data){
     return NULL;
 }
 
+
+
 void https_close(struct https_socket* sock){
     if(sock->ssl){
         SSL_shutdown(sock->ssl);
@@ -171,7 +240,11 @@ void https_close(struct https_socket* sock){
     if(sock->socket_fd != -1){
         close(sock->socket_fd);
     }
+    free(sock->hostname);
+    sock->hostname = NULL;
 }
+
+
 
 void https_ctx_free(){
     if(ssl_ctx){
