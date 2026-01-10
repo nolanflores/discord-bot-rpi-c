@@ -1,2 +1,2 @@
 #!/bin/bash
-gcc main.c websocket.c cJSON.c -o run -lssl -lcrypto
+gcc -Wall -Wextra main.c https_socket.c websocket.c cJSON.c -o run -lssl -lcrypto
