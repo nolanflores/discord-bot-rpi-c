@@ -132,13 +132,20 @@ int https_connect(struct https_socket* sock, const char* hostname, const char* p
     return 0;
 }
 
+
+/*
+ * Read HTTP headers from the SSL connection into the passed buffer.
+ * Updates buffer_size to the number of bytes read.
+ * 
+ * Returns a pointer to the start of the body in the buffer on success,
+ * or returns NULL on failure.
+ */
 static char* https_read_headers(SSL* ssl, char* buffer, size_t* buffer_size, size_t buffer_capacity){
     char chunk[8192];
     char* current = buffer;
-    size_t total_bytes = 0;
 
     while(1){
-        if(total_bytes + 8192 > buffer_capacity){
+        if(*buffer_size + 8192 > buffer_capacity){
             fprintf(stderr, "Failed to read response: Header too large\n");
             return NULL;
         }
@@ -147,7 +154,7 @@ static char* https_read_headers(SSL* ssl, char* buffer, size_t* buffer_size, siz
             fprintf(stderr, "Failed to read headers\n");
             return NULL;
         }
-        total_bytes += bytes_read;
+        *buffer_size += bytes_read;
         memcpy(current, chunk, bytes_read);
         current += bytes_read;
         *current = '\0';
@@ -159,90 +166,131 @@ static char* https_read_headers(SSL* ssl, char* buffer, size_t* buffer_size, siz
             search_start = buffer;
         char* header_end = strstr(search_start, "\r\n\r\n");
         if(header_end){
-            *buffer_size = total_bytes;
             return header_end + 4;
         }
     }
 }
 
+/*
+ * Reads the chunks of a chunked transfer encoded response.
+ * Copies the contents of the chunks into a heap allocated string.
+ * 
+ * Returns the allocated string on success, NULL on failure
+ */
+static char* https_read_chunked(SSL* ssl, char* buffer, size_t* buffer_size, size_t buffer_capacity, char* body_start){
+    while(1){
+        if(*buffer_size + 8192 >= buffer_capacity){
+            fprintf(stderr, "Chunked response too large\n");
+            return NULL;
+        }
+        int b_r = SSL_read(ssl, buffer + *buffer_size, 8192);
+        if(b_r <= 0){
+            fprintf(stderr, "Failed to read chunked response\n");
+            return NULL;
+        }
+        *buffer_size += b_r;
+        buffer[*buffer_size] = '\0';
+        
+        if(*buffer_size >= 5 && strcmp(buffer + *buffer_size - 5, "0\r\n\r\n") == 0)
+            break;
+    }
+    
+    char* response = (char*)malloc(*buffer_size - (body_start - buffer) + 1);
+    if(!response){
+        fprintf(stderr, "Failed to allocate memory for response\n");
+        return NULL;
+    }
+    
+    char* curr = body_start;
+    size_t r_i = 0;
+    
+    while(1){
+        size_t chunk_size = (size_t)strtoul(curr, NULL, 16);
+        if(chunk_size == 0){
+            response[r_i] = '\0';
+            break;
+        }
+        
+        char* chunk_start = strstr(curr, "\r\n");
+        if(!chunk_start){
+            fprintf(stderr, "Malformed chunked encoding\n");
+            free(response);
+            return NULL;
+        }
+        chunk_start += 2;
+        
+        memcpy(response + r_i, chunk_start, chunk_size);
+        r_i += chunk_size;
+        curr = chunk_start + chunk_size + 2;
+    }
+    
+    return response;
+}
+
+/*
+ * Read a response body with a known Content-
+ *
+ * Returns heap allocated string on success, NULL on failure
+ */
+static char* https_read_content_length(SSL* ssl, char* buffer, size_t* buffer_size, size_t buffer_capacity, char* body_start, size_t content_length){
+    size_t received_body_len = *buffer_size - (body_start - buffer);
+    
+    while(received_body_len < content_length){
+        if(*buffer_size + 8192 >= buffer_capacity){
+            fprintf(stderr, "Response body too large\n");
+            return NULL;
+        }
+        int b_r = SSL_read(ssl, buffer + *buffer_size, 8192);
+        if(b_r <= 0){
+            fprintf(stderr, "Failed to read response body\n");
+            return NULL;
+        }
+        *buffer_size += b_r;
+        received_body_len += b_r;
+        buffer[*buffer_size] = '\0';
+    }
+    
+    char* response = (char*)malloc(content_length + 1);
+    if(!response){
+        fprintf(stderr, "Failed to allocate memory for response\n");
+        return NULL;
+    }
+    memcpy(response, body_start, content_length);
+    response[content_length] = '\0';
+    return response;
+}
+
 char* https_send(struct https_socket* sock, const char* data){
-    /*
-     * This function is ridiculously long and I barely understand what I have created here.
-     * I do not think it is robust, and is probably susceptible to a buffer overflow.
-     * I will have to rewrite it later.
-     */
     if(SSL_write(sock->ssl, data, strlen(data)) <= 0){
         fprintf(stderr, "Failed to send request\n");
         return NULL;
     }
-    //8KiB = 8192
+    
     char buffer[64 * 8192];
     size_t buffer_size = 0;
     char* header_end = https_read_headers(sock->ssl, buffer, &buffer_size, sizeof(buffer));
     if(!header_end){
         return NULL;
     }
-    if(strstr(buffer, "Transfer-Encoding: chunked\r\n")){
-        while(1){
-            if(buffer_size + 8192 >= 524288){
-                fprintf(stderr, "Response too large\n");
-                return NULL;
-            }
-            int b_r = SSL_read(sock->ssl, buffer + buffer_size, 8192);
-            if(b_r <= 0){
-                fprintf(stderr, "Failed to read chunked response\n");
-                return NULL;
-            }
-            buffer_size += b_r;
-            buffer[buffer_size] = '\0';
-            if(strcmp(buffer + buffer_size - 5, "0\r\n\r\n") == 0)
-                break;
-        }
-        char* response = (char*)malloc(buffer_size - (header_end - buffer) + 1);
-        char* curr = header_end;
-        int r_i = 0;
-        while(1){
-            int jump = (int)strtol(curr, NULL, 16);
-            if(jump == 0){
-                response[r_i] = '\0';
-                break;
-            }
-            char* chunk_start = strstr(curr, "\r\n")+2;
-            memcpy(response + r_i, chunk_start, jump);
-            r_i += jump;
-            curr = chunk_start + jump + 2;
-        }
-        return response;
-    }else{
-        char* content_length_str = strstr(buffer, "Content-Length: ");
-        if(content_length_str){
-            if(content_length_str > header_end){
-                fprintf(stderr, "Error, Content-Length after header end\n");
-                return NULL;
-            }
-            content_length_str += 16;
-            int content_length = (int)strtol(content_length_str, NULL, 10);
-            size_t received_body_len = buffer_size - (header_end - buffer);
-            while(received_body_len < (size_t)content_length){
-                if(buffer_size + 8192 >= 524288){
-                    fprintf(stderr, "Response too large\n");
-                    return NULL;
-                }
-                int b_r = SSL_read(sock->ssl, buffer + buffer_size, 8192);
-                if(b_r <= 0){
-                    fprintf(stderr, "Failed to read response body\n");
-                    return NULL;
-                }
-                buffer_size += b_r;
-                received_body_len += b_r;
-                buffer[buffer_size] = '\0';
-            }
-            char* response = (char*)malloc(content_length + 1);
-            memcpy(response, header_end, content_length);
-            response[content_length] = '\0';
-            return response;
-        }
+    
+    //chunked encoding
+    if(strcasestr(buffer, "Transfer-Encoding: chunked\r\n")){
+        return https_read_chunked(sock->ssl, buffer, &buffer_size, sizeof(buffer), header_end);
     }
+    
+    //Content-Length
+    char* content_length_str = strcasestr(buffer, "Content-Length:");
+    if(content_length_str){
+        if(content_length_str > header_end){
+            fprintf(stderr, "Error, Content-Length after header end\n");
+            return NULL;
+        }
+        content_length_str += 15;
+        size_t content_length = (size_t)strtoul(content_length_str, NULL, 10);
+        return https_read_content_length(sock->ssl, buffer, &buffer_size, sizeof(buffer), header_end, content_length);
+    }
+    
+    fprintf(stderr, "Response has neither Content-Length nor chunked encoding\n");
     return NULL;
 }
 
