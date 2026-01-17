@@ -132,7 +132,38 @@ int https_connect(struct https_socket* sock, const char* hostname, const char* p
     return 0;
 }
 
+static char* https_read_headers(SSL* ssl, char* buffer, size_t* buffer_size, size_t buffer_capacity){
+    char chunk[8192];
+    char* current = buffer;
+    size_t total_bytes = 0;
 
+    while(1){
+        if(total_bytes + 8192 > buffer_capacity){
+            fprintf(stderr, "Failed to read response: Header too large\n");
+            return NULL;
+        }
+        int bytes_read = SSL_read(ssl, chunk, 8191);
+        if(bytes_read <= 0){
+            fprintf(stderr, "Failed to read headers\n");
+            return NULL;
+        }
+        total_bytes += bytes_read;
+        memcpy(current, chunk, bytes_read);
+        current += bytes_read;
+        *current = '\0';
+
+        char* search_start;
+        if(current - bytes_read >= buffer + 3)
+            search_start = current - bytes_read - 3;
+        else
+            search_start = buffer;
+        char* header_end = strstr(search_start, "\r\n\r\n");
+        if(header_end){
+            *buffer_size = total_bytes;
+            return header_end + 4;
+        }
+    }
+}
 
 char* https_send(struct https_socket* sock, const char* data){
     /*
@@ -146,25 +177,10 @@ char* https_send(struct https_socket* sock, const char* data){
     }
     //8KiB = 8192
     char buffer[64 * 8192];
-    int buffer_size = 0;
-    char* header_end = NULL;
-    while(1){
-        if(buffer_size + 8192 >= 524288){
-            fprintf(stderr, "Response too large\n");
-            return NULL;
-        }
-        int b_r = SSL_read(sock->ssl, buffer + buffer_size, 8192);
-        if(b_r <= 0){
-            fprintf(stderr, "Failed to read response\n");
-            return NULL;
-        }
-        buffer[buffer_size + b_r] = '\0';
-        header_end = strstr(buffer + buffer_size, "\r\n\r\n");
-        buffer_size += b_r;
-        if(header_end){
-            header_end += 4;
-            break;
-        }
+    size_t buffer_size = 0;
+    char* header_end = https_read_headers(sock->ssl, buffer, &buffer_size, sizeof(buffer));
+    if(!header_end){
+        return NULL;
     }
     if(strstr(buffer, "Transfer-Encoding: chunked\r\n")){
         while(1){
