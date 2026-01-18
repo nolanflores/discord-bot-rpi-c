@@ -29,6 +29,8 @@ int main(){
             }
             if(strcmp(msg_content, "!kys") == 0){
                 discord_send_message(&bot, channel_id, "Go fuck yourself.");
+            }else if(strcmp(msg_content, "!quit") == 0){
+                break;
             }
         }
         cJSON_Delete(mjson);
