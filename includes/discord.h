@@ -13,8 +13,10 @@ struct discord_bot{
     int heartbeat_interval;
 };
 
-int discord_bot_init(struct discord_bot* bot, const char* token);
+int discord_init(struct discord_bot* bot);
 
-void discord_bot_cleanup(struct discord_bot* bot);
+char* discord_send_message(struct discord_bot* bot, const char* channel, const char* content);
+
+void discord_cleanup(struct discord_bot* bot);
 
 #endif

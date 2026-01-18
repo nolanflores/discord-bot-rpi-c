@@ -2,6 +2,7 @@
 #include "cJSON.h"
 #include "discord_token.h"
 #include <time.h>
+#include <netdb.h>
 
 static void* heartbeat_loop(void* arg){
     struct discord_bot* bot = (struct discord_bot*)arg;
@@ -24,7 +25,7 @@ static void* heartbeat_loop(void* arg){
     return NULL;
 }
 
-int discord_bot_init(struct discord_bot* bot, const char* token){
+int discord_init(struct discord_bot* bot){
     bot->rest_api = https_dns_lookup("discord.com", "443");
     if(!bot->rest_api)
         return 1;
@@ -71,9 +72,38 @@ int discord_bot_init(struct discord_bot* bot, const char* token){
     pthread_mutex_lock(&bot->send_mutex);
     ws_send_text(&bot->ws, identify_payload);
     pthread_mutex_unlock(&bot->send_mutex);
+    return 0;
 }
 
-void discord_bot_cleanup(struct discord_bot* bot){
+char* discord_send_message(struct discord_bot* bot, const char* channel_id, const char* content){
+    struct https_socket hs;
+    if(https_connect_addrinfo(&hs, bot->rest_api)){
+        return NULL;
+    }
+
+    char request[8192];
+    snprintf(request, 8192,
+        "POST /api/v10/channels/%s/messages HTTP/1.1\r\n"
+        "Host: discord.com\r\n"
+        "Authorization: %s\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %zu\r\n"
+        "\r\n"
+        "{\"content\":\"%s\"}",
+        channel_id,
+        DISCORD_TOKEN,
+        strlen(content) + 14,
+        content
+    );
+
+    char* response = https_send(&hs, request);
+    https_close(&hs);
+    if(response)
+        return response;
+    return NULL;
+}
+
+void discord_cleanup(struct discord_bot* bot){
     bot->heartbeat_interval = 0;
     pthread_join(bot->heartbeat_thread, NULL);
     pthread_mutex_destroy(&bot->send_mutex);
