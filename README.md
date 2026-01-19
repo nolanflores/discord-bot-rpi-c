@@ -67,7 +67,7 @@ This will create an executable file that can be run
 
 ## Deployment
 
-I run this program with systemd, in order to restart the program should it fail. It is not necessary, but I would recomend looking into it.
+I run this program with systemd in order to restart the program should it fail. It is not necessary, but I would recomend looking into it.
 
 ## Built With
 
