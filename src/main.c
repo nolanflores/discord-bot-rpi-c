@@ -1,5 +1,4 @@
 #include "discord.h"
-#include "cJSON.h"
 
 int main(){
     https_ctx_init();
@@ -11,30 +10,20 @@ int main(){
     }
 
     while(1){
-        struct ws_message* message = ws_receive(&bot.ws);
-        if(!message){
+        struct discord_event* event = discord_receive_event(&bot);
+        if(!event){
             break;
         }
-        cJSON* mjson = cJSON_ParseWithLength(message->payload, message->payload_len);
-        cJSON* t = cJSON_GetObjectItemCaseSensitive(mjson, "t");
-        if(t && t->valuestring && strcmp(t->valuestring, "MESSAGE_CREATE") == 0){
-            cJSON* d = cJSON_GetObjectItemCaseSensitive(mjson, "d");
-            cJSON* content = cJSON_GetObjectItemCaseSensitive(d, "content");
-            char* msg_content = content->valuestring;
-            char* channel_id = cJSON_GetObjectItemCaseSensitive(d, "channel_id")->valuestring;
-            if(!msg_content){
-                cJSON_Delete(mjson);
-                ws_free_message(message);
-                continue;
+        if(event->type == MESSAGE_CREATE){
+            if(strcmp(event->content, "!version") == 0){
+                discord_send_message(&bot, event->channel_id, "Cumbot GNU C11 Edition");
             }
-            if(strcmp(msg_content, "!kys") == 0){
-                discord_send_message(&bot, channel_id, "Go fuck yourself.");
-            }else if(strcmp(msg_content, "!quit") == 0){
-                break;
-            }
+        }else if(event->type == CLOSE_CONNECTION){
+            discord_free_event(event);
+            break;
         }
-        cJSON_Delete(mjson);
-        ws_free_message(message);
+
+        discord_free_event(event);
     }
 
     discord_cleanup(&bot);

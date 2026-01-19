@@ -1,5 +1,4 @@
 #include "discord.h"
-#include "cJSON.h"
 #include "discord_token.h"
 #include <time.h>
 #include <netdb.h>
@@ -73,6 +72,60 @@ int discord_init(struct discord_bot* bot){
     ws_send_text(&bot->ws, identify_payload);
     pthread_mutex_unlock(&bot->send_mutex);
     return 0;
+}
+
+struct discord_event* discord_receive_event(struct discord_bot* bot){
+    struct ws_message* message = ws_receive(&bot->ws);
+    if(!message)
+        return NULL;
+    struct discord_event* event = (struct discord_event*)malloc(sizeof(struct discord_event));
+    if(message->opcode == 8){
+        ws_free_message(message);
+        event->type = CLOSE_CONNECTION;
+        event->json = NULL;
+        event->channel_id = NULL;
+        event->content = NULL;
+        return event;
+    }
+    cJSON* json = cJSON_Parse(message->payload);
+    ws_free_message(message);
+    if(!json){
+        free(event);
+        return NULL;
+    }
+    event->json = json;
+    cJSON* t = cJSON_GetObjectItemCaseSensitive(json, "t");
+    if(!t || !t->valuestring){
+        event->type = OTHER;
+        event->channel_id = NULL;
+        event->content = NULL;
+        return event;
+    }
+    if(strcmp(t->valuestring, "MESSAGE_CREATE") == 0){
+        event->type = MESSAGE_CREATE;
+        cJSON* d = cJSON_GetObjectItemCaseSensitive(json, "d");
+        cJSON* content = cJSON_GetObjectItemCaseSensitive(d, "content");
+        cJSON* channel_id = cJSON_GetObjectItemCaseSensitive(d, "channel_id");
+        if(!content || !channel_id){
+            free(event);
+            return NULL;
+        }
+        event->content = content->valuestring;
+        event->channel_id = channel_id->valuestring;
+        return event;
+    }
+    event->type = OTHER;
+    event->channel_id = NULL;
+    event->content = NULL;
+    return event;
+}
+
+void discord_free_event(struct discord_event* event){
+    if(event){
+        if(event->json)
+            cJSON_Delete(event->json);
+        free(event);
+    }
 }
 
 char* discord_send_message(struct discord_bot* bot, const char* channel_id, const char* content){
