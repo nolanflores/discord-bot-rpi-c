@@ -140,16 +140,24 @@ struct ws_message* ws_receive(struct websocket* ws){
             payload_lengths[payload_count] = ((size_t)ext[0] << 8) | (size_t)ext[1];
         }
         payloads[payload_count] = (char*)malloc(payload_lengths[payload_count]+1);
-        int bytes_read = SSL_read(ws->https_sock.ssl, payloads[payload_count], payload_lengths[payload_count]);
-        if(bytes_read <= 0){
-            fprintf(stderr, "Failed to read WebSocket payload\n");
-            ws_free_message(msg);
-            return NULL;
+        int bytes_read = 0;
+        while(bytes_read < (int)payload_lengths[payload_count]){
+            int b_r = SSL_read(ws->https_sock.ssl, payloads[payload_count] + bytes_read, payload_lengths[payload_count] - bytes_read);
+            if(b_r <= 0){
+                fprintf(stderr, "Failed to read WebSocket payload\n");
+                ws_free_message(msg);
+                for(int i = 0; i < payload_count; i++)
+                    free(payloads[i]);
+                return NULL;
+            }
+            bytes_read += b_r;
         }
         payload_count++;
         if(payload_count >= 100){
             fprintf(stderr, "Too many fragmented frames\n");
             ws_free_message(msg);
+            for(int i = 0; i < payload_count; i++)
+                free(payloads[i]);
             return NULL;
         }
     }while(!(header[0] & 0x80));
