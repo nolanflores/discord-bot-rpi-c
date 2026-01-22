@@ -15,14 +15,16 @@ struct discord_bot{
 };
 
 enum event_type{
+    UNDEFINED_EVENT,
     MESSAGE_CREATE,
-    CLOSE_CONNECTION,
-    OTHER
+    INTERACTION_CREATE,
+    CLOSE_CONNECTION
 };
 
 struct discord_event{
     cJSON* json;
     char* channel_id;
+    char* custom_id;
     char* content;
     enum event_type type;
 };
@@ -30,6 +32,8 @@ struct discord_event{
 int discord_init(struct discord_bot* bot);
 
 char* discord_send_message(struct discord_bot* bot, const char* channel, const char* content);
+
+char* discord_send_embed(struct discord_bot* bot, const char* channel, const char* title, const char* description, const char* color_hex);
 
 struct discord_event* discord_receive_event(struct discord_bot* bot);
 
