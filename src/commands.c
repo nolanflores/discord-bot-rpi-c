@@ -1,5 +1,4 @@
 #include "commands.h"
-#include "discord.h"
 
 enum command_hashes{
     CMD_SELL = 2090720021,

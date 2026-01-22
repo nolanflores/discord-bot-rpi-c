@@ -11,6 +11,7 @@ struct discord_bot{
     struct websocket ws;
     pthread_t heartbeat_thread;
     pthread_mutex_t mutex;
+    pthread_cond_t cond;
     int heartbeat_interval;
     int event_s;
 };

@@ -9,18 +9,30 @@ static void* heartbeat_loop(void* arg){
     char heartbeat_payload[64];
 
     struct timespec ts;
-    ts.tv_sec = bot->heartbeat_interval / 1000;
-    ts.tv_nsec = (bot->heartbeat_interval % 1000) * 1000000;
+    int interval_sec = bot->heartbeat_interval / 1000;
+    int interval_nsec = (bot->heartbeat_interval % 1000) * 1000000;
 
     while(1){
-        nanosleep(&ts, NULL);
-        if(bot->heartbeat_interval == 0)
-            break;
+        clock_gettime(0, &ts);
+        ts.tv_sec += interval_sec;
+        ts.tv_nsec += interval_nsec;
+        if(ts.tv_nsec >= 1000000000){
+            ts.tv_sec += 1;
+            ts.tv_nsec -= 1000000000;
+        }
+
         pthread_mutex_lock(&bot->mutex);
-        snprintf(heartbeat_payload, 64,
-            "{\"op\":1,\"d\":%d}",
-            bot->event_s == -1 ? NULL : bot->event_s
-        );
+        pthread_cond_timedwait(&bot->cond, &bot->mutex, &ts);
+
+        if(bot->heartbeat_interval == 0){
+            pthread_mutex_unlock(&bot->mutex);
+            break;
+        }
+        if(bot->event_s == -1){
+            snprintf(heartbeat_payload, 64,"{\"op\":1,\"d\":null}");
+        }else{
+            snprintf(heartbeat_payload, 64,"{\"op\":1,\"d\":%d}", bot->event_s);
+        }
         ws_send_text(&bot->ws, heartbeat_payload);
         pthread_mutex_unlock(&bot->mutex);
     }
@@ -50,7 +62,10 @@ int discord_init(struct discord_bot* bot){
     cJSON_Delete(json);
     ws_free_message(msg);
     
-    if(pthread_mutex_init(&bot->mutex, NULL) || pthread_create(&bot->heartbeat_thread, NULL, heartbeat_loop, bot)){
+    if(pthread_mutex_init(&bot->mutex, NULL) || 
+        pthread_cond_init(&bot->cond, NULL) ||
+        pthread_create(&bot->heartbeat_thread, NULL, heartbeat_loop, bot)
+    ){
         freeaddrinfo(bot->rest_api);
         ws_close(&bot->ws);
         return 1;
@@ -203,7 +218,10 @@ char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const 
 }
 
 void discord_cleanup(struct discord_bot* bot){
+    pthread_mutex_lock(&bot->mutex);
     bot->heartbeat_interval = 0;
+    pthread_cond_signal(&bot->cond);
+    pthread_mutex_unlock(&bot->mutex);
     pthread_join(bot->heartbeat_thread, NULL);
     pthread_mutex_destroy(&bot->mutex);
     ws_close(&bot->ws);
