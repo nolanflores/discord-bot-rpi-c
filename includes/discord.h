@@ -10,8 +10,9 @@ struct discord_bot{
     struct addrinfo* rest_api;
     struct websocket ws;
     pthread_t heartbeat_thread;
-    pthread_mutex_t send_mutex;
+    pthread_mutex_t mutex;
     int heartbeat_interval;
+    int event_s;
 };
 
 enum event_type{

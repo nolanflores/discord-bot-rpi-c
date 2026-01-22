@@ -6,7 +6,7 @@
 static void* heartbeat_loop(void* arg){
     struct discord_bot* bot = (struct discord_bot*)arg;
 
-    const char* heartbeat_payload = "{\"op\":1,\"d\":null}";
+    char heartbeat_payload[64];
 
     struct timespec ts;
     ts.tv_sec = bot->heartbeat_interval / 1000;
@@ -16,9 +16,13 @@ static void* heartbeat_loop(void* arg){
         nanosleep(&ts, NULL);
         if(bot->heartbeat_interval == 0)
             break;
-        pthread_mutex_lock(&bot->send_mutex);
+        pthread_mutex_lock(&bot->mutex);
+        snprintf(heartbeat_payload, 64,
+            "{\"op\":1,\"d\":%d}",
+            bot->event_s == -1 ? NULL : bot->event_s
+        );
         ws_send_text(&bot->ws, heartbeat_payload);
-        pthread_mutex_unlock(&bot->send_mutex);
+        pthread_mutex_unlock(&bot->mutex);
     }
 
     return NULL;
@@ -39,13 +43,14 @@ int discord_init(struct discord_bot* bot){
         ws_close(&bot->ws);
         return 1;
     }
+    bot->event_s = -1;
     cJSON* json = cJSON_Parse(msg->payload);
     cJSON* d = cJSON_GetObjectItem(json, "d");
     bot->heartbeat_interval = cJSON_GetObjectItem(d, "heartbeat_interval")->valueint;
     cJSON_Delete(json);
     ws_free_message(msg);
     
-    if(pthread_mutex_init(&bot->send_mutex, NULL) || pthread_create(&bot->heartbeat_thread, NULL, heartbeat_loop, bot)){
+    if(pthread_mutex_init(&bot->mutex, NULL) || pthread_create(&bot->heartbeat_thread, NULL, heartbeat_loop, bot)){
         freeaddrinfo(bot->rest_api);
         ws_close(&bot->ws);
         return 1;
@@ -68,9 +73,9 @@ int discord_init(struct discord_bot* bot){
         DISCORD_TOKEN,
         (1 << 9) | (1 << 12) | (1 << 15)//GUILD_MESSAGES, DIRECT_MESSAGES, MESSAGE_CONTENT
     );
-    pthread_mutex_lock(&bot->send_mutex);
+    pthread_mutex_lock(&bot->mutex);
     ws_send_text(&bot->ws, identify_payload);
-    pthread_mutex_unlock(&bot->send_mutex);
+    pthread_mutex_unlock(&bot->mutex);
     return 0;
 }
 
@@ -100,6 +105,10 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
     if(!t || !t->valuestring){
         return event;
     }
+    cJSON* s = cJSON_GetObjectItemCaseSensitive(json, "s");
+    pthread_mutex_lock(&bot->mutex);
+    bot->event_s = s->valueint;
+    pthread_mutex_unlock(&bot->mutex);
     if(strcmp(t->valuestring, "MESSAGE_CREATE") == 0){
         event->type = MESSAGE_CREATE;
         cJSON* d = cJSON_GetObjectItemCaseSensitive(json, "d");
@@ -196,7 +205,7 @@ char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const 
 void discord_cleanup(struct discord_bot* bot){
     bot->heartbeat_interval = 0;
     pthread_join(bot->heartbeat_thread, NULL);
-    pthread_mutex_destroy(&bot->send_mutex);
+    pthread_mutex_destroy(&bot->mutex);
     ws_close(&bot->ws);
     freeaddrinfo(bot->rest_api);
 }
