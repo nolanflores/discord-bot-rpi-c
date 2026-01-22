@@ -1,7 +1,17 @@
 #include "discord.h"
 #include "commands.h"
+#include <signal.h>
+
+volatile sig_atomic_t stop = 0;
+
+void handle_sigint(int sig) {
+    (void)sig;
+    stop = 1;
+}
 
 int main(){
+    signal(SIGINT, handle_sigint);
+
     https_ctx_init();
 
     struct discord_bot bot;
