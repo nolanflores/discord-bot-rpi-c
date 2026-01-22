@@ -1,4 +1,5 @@
 #include "discord.h"
+#include "commands.h"
 
 int main(){
     https_ctx_init();
@@ -12,17 +13,18 @@ int main(){
     while(1){
         struct discord_event* event = discord_receive_event(&bot);
         if(!event){
+            fprintf(stderr, "Failed to receive event\n");
             break;
         }
         if(event->type == MESSAGE_CREATE){
-            if(strcmp(event->content, "!version") == 0){
-                discord_send_message(&bot, event->channel_id, "Cumbot GNU C11 Edition");
+            if(event->content[0] == '!'){
+                handle_command(&bot, event->channel_id, event->content);
             }
         }else if(event->type == CLOSE_CONNECTION){
             discord_free_event(event);
+            fprintf(stderr, "Connection closed\n");
             break;
         }
-
         discord_free_event(event);
     }
 

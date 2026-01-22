@@ -114,6 +114,21 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
         event->content = content->valuestring;
         event->channel_id = channel_id->valuestring;
         return event;
+    }else if(strcmp(t->valuestring, "INTERACTION_CREATE") == 0){
+        event->type = INTERACTION_CREATE;
+        cJSON* d = cJSON_GetObjectItemCaseSensitive(json, "d");
+        cJSON* id = cJSON_GetObjectItemCaseSensitive(d, "id");
+        event->id = id->valuestring;
+        cJSON* token = cJSON_GetObjectItemCaseSensitive(d, "token");
+        event->token = token->valuestring;
+        cJSON* data = cJSON_GetObjectItemCaseSensitive(d, "data");
+        cJSON* custom_id = cJSON_GetObjectItemCaseSensitive(data, "custom_id");
+        event->custom_id = custom_id->valuestring;
+        cJSON* message = cJSON_GetObjectItemCaseSensitive(d, "message");
+        cJSON* content = cJSON_GetObjectItemCaseSensitive(message, "content");
+        cJSON* channel_id = cJSON_GetObjectItemCaseSensitive(message, "channel_id");
+        event->content = content->valuestring;
+        event->channel_id = channel_id->valuestring;
     }
     return event;
 }
@@ -154,8 +169,14 @@ char* discord_send_message(struct discord_bot* bot, const char* channel_id, cons
     return discord_send(bot, request);
 }
 
-char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const char* title, const char* description, const char* color_hex){
-    size_t content_length = strlen(title) + strlen(description) + strlen(color_hex) + 57;
+char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const char* title, const char* description, const int color_hex){
+    char content[6144];
+    size_t content_length = snprintf(content, 6144,
+        "{\"embeds\":[{\"title\":\"%s\",\"description\":\"%s\",\"color\":%d}]}",
+        title,
+        description,
+        color_hex
+    );
     char request[8192];
     snprintf(request, 8192,
         "POST /api/v10/channels/%s/messages HTTP/1.1\r\n"
@@ -163,14 +184,11 @@ char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const 
         "Authorization: %s\r\n"
         "Content-Type: application/json\r\n"
         "Content-Length: %zu\r\n"
-        "\r\n"
-        "{\"embeds\":{\"title\":\"%s\",\"description\":\"%s\",\"color\":\"%s\"}}",
+        "\r\n%s",
         channel_id,
         DISCORD_TOKEN,
         content_length,
-        title,
-        description,
-        color_hex
+        content
     );
     return discord_send(bot, request);
 }
