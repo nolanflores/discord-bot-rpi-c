@@ -98,7 +98,7 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
     struct ws_message* message = ws_receive(&bot->ws);
     if(!message)
         return NULL;
-    if(message->opcode != 1 && message->opcode != 8){
+    if(message->opcode != 1 && message->opcode != 8 || strncmp(message->payload, "{\"op\":11", 8) == 0){
         ws_free_message(message);
         return NULL;
     }
