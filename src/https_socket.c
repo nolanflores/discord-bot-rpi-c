@@ -22,12 +22,12 @@ static SSL_CTX* ssl_ctx = NULL;
  */
 static int https_tcp_connect_addrinfo(struct https_socket* sock, struct addrinfo* addr_list){
     if(!addr_list){
-        fprintf(stderr, "Address info is NULL\n");
+        fputs("Address info is NULL\n", stderr);
         return 1;
     }
     sock->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(sock->socket_fd == -1){
-        fprintf(stderr, "Failed to create socket\n");
+        fputs("Failed to create socket\n", stderr);
         return 1;
     }
     struct addrinfo* ptr = addr_list;
@@ -38,7 +38,7 @@ static int https_tcp_connect_addrinfo(struct https_socket* sock, struct addrinfo
             return 0;
         ptr = ptr->ai_next;
     }
-    fprintf(stderr, "Failed to connect to address\n");
+    fputs("Failed to connect to address\n", stderr);
     close(sock->socket_fd);
     return 1;
 }
@@ -66,13 +66,13 @@ static int https_tcp_connect(struct https_socket* sock, const char* hostname, co
 static int https_tls_connect(struct https_socket* sock){
     sock->ssl = SSL_new(ssl_ctx);
     if(!sock->ssl){
-        fprintf(stderr, "Failed to create SSL structure\n");
+        fputs("Failed to create SSL structure\n", stderr);
         close(sock->socket_fd);
         return 1;
     }
     SSL_set_fd(sock->ssl, sock->socket_fd);
     if(SSL_connect(sock->ssl) != 1){
-        fprintf(stderr, "SSL connection failed\n");
+        fputs("SSL connection failed\n", stderr);
         SSL_free(sock->ssl);
         close(sock->socket_fd);
         return 1;
@@ -91,7 +91,7 @@ int https_ctx_init(){
     ssl_ctx = SSL_CTX_new(TLS_client_method());
     if(ssl_ctx)
         return 0;
-    fprintf(stderr, "Failed to initialize SSL context\n");
+    fputs("Failed to initialize SSL context\n", stderr);
     return 1;
 }
 
@@ -106,7 +106,7 @@ struct addrinfo* https_dns_lookup(const char* hostname, const char* port){
     hints.ai_protocol = 0;
     int result = getaddrinfo(hostname, port, &hints, &addr_list);
     if(result != 0){
-        fprintf(stderr, "Failed to get address info\n");
+        fputs("Failed to get address info\n", stderr);
         return NULL;
     }
     return addr_list;
@@ -146,12 +146,12 @@ static char* https_read_headers(SSL* ssl, char* buffer, size_t* buffer_size, siz
 
     while(1){
         if(*buffer_size + 8192 > buffer_capacity){
-            fprintf(stderr, "Failed to read response: Header too large\n");
+            fputs("Failed to read response: Header too large\n", stderr);
             return NULL;
         }
         int bytes_read = SSL_read(ssl, chunk, 8191);
         if(bytes_read <= 0){
-            fprintf(stderr, "Failed to read headers\n");
+            fputs("Failed to read headers\n", stderr);
             return NULL;
         }
         *buffer_size += bytes_read;
@@ -180,24 +180,24 @@ static char* https_read_headers(SSL* ssl, char* buffer, size_t* buffer_size, siz
 static char* https_read_chunked(SSL* ssl, char* buffer, size_t* buffer_size, size_t buffer_capacity, char* body_start){
     while(1){
         if(*buffer_size + 8192 >= buffer_capacity){
-            fprintf(stderr, "Chunked response too large\n");
+            fputs("Chunked response too large\n", stderr);
             return NULL;
         }
         int b_r = SSL_read(ssl, buffer + *buffer_size, 8192);
         if(b_r <= 0){
-            fprintf(stderr, "Failed to read chunked response\n");
+            fputs("Failed to read chunked response\n", stderr);
             return NULL;
         }
         *buffer_size += b_r;
         buffer[*buffer_size] = '\0';
         
-        if(*buffer_size >= 5 && strcmp(buffer + *buffer_size - 5, "0\r\n\r\n") == 0)
+        if(*buffer_size >= 5 && memcmp(buffer + *buffer_size - 5, "0\r\n\r\n", 5) == 0)
             break;
     }
     
     char* response = (char*)malloc(*buffer_size - (body_start - buffer) + 1);
     if(!response){
-        fprintf(stderr, "Failed to allocate memory for response\n");
+        fputs("Failed to allocate memory for response\n", stderr);
         return NULL;
     }
     
@@ -213,7 +213,7 @@ static char* https_read_chunked(SSL* ssl, char* buffer, size_t* buffer_size, siz
         
         char* chunk_start = strstr(curr, "\r\n");
         if(!chunk_start){
-            fprintf(stderr, "Malformed chunked encoding\n");
+            fputs("Malformed chunked encoding\n", stderr);
             free(response);
             return NULL;
         }
@@ -228,7 +228,7 @@ static char* https_read_chunked(SSL* ssl, char* buffer, size_t* buffer_size, siz
 }
 
 /*
- * Read a response body with a known Content-
+ * Read a response body with a known Content-Length from the SSL connection.
  *
  * Returns heap allocated string on success, NULL on failure
  */
@@ -237,12 +237,12 @@ static char* https_read_content_length(SSL* ssl, char* buffer, size_t* buffer_si
     
     while(received_body_len < content_length){
         if(*buffer_size + 8192 >= buffer_capacity){
-            fprintf(stderr, "Response body too large\n");
+            fputs("Response body too large\n", stderr);
             return NULL;
         }
         int b_r = SSL_read(ssl, buffer + *buffer_size, 8192);
         if(b_r <= 0){
-            fprintf(stderr, "Failed to read response body\n");
+            fputs("Failed to read response body\n", stderr);
             return NULL;
         }
         *buffer_size += b_r;
@@ -252,7 +252,7 @@ static char* https_read_content_length(SSL* ssl, char* buffer, size_t* buffer_si
     
     char* response = (char*)malloc(content_length + 1);
     if(!response){
-        fprintf(stderr, "Failed to allocate memory for response\n");
+        fputs("Failed to allocate memory for response\n", stderr);
         return NULL;
     }
     memcpy(response, body_start, content_length);
@@ -262,7 +262,7 @@ static char* https_read_content_length(SSL* ssl, char* buffer, size_t* buffer_si
 
 char* https_send(struct https_socket* sock, const char* data){
     if(SSL_write(sock->ssl, data, strlen(data)) <= 0){
-        fprintf(stderr, "Failed to send request\n");
+        fputs("Failed to send request\n", stderr);
         return NULL;
     }
     
@@ -282,7 +282,7 @@ char* https_send(struct https_socket* sock, const char* data){
     char* content_length_str = strcasestr(buffer, "Content-Length:");
     if(content_length_str){
         if(content_length_str > header_end){
-            fprintf(stderr, "Error, Content-Length after header end\n");
+            fputs("Error, Content-Length after header end\n", stderr);
             return NULL;
         }
         content_length_str += 15;
@@ -290,7 +290,7 @@ char* https_send(struct https_socket* sock, const char* data){
         return https_read_content_length(sock->ssl, buffer, &buffer_size, sizeof(buffer), header_end, content_length);
     }
     
-    fprintf(stderr, "Response has neither Content-Length nor chunked encoding\n");
+    fputs("Response has neither Content-Length nor chunked encoding\n", stderr);
     return NULL;
 }
 

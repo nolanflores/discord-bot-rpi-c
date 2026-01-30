@@ -25,18 +25,18 @@ static int ws_handshake(struct websocket* ws){
         ws->https_sock.hostname, base64_key
     );
     if(0 >= SSL_write(ws->https_sock.ssl, request, strlen(request))){
-        fprintf(stderr, "Failed to send websocket upgrade request\n");
+        fputs("Failed to send websocket upgrade request\n", stderr);
         return 1;
     }
     char response[8192];
     int bytes_read = SSL_read(ws->https_sock.ssl, response, 8191);
     if(bytes_read <= 0){
-        fprintf(stderr, "Failed to read websocket upgrade response\n");
+        fputs("Failed to read websocket upgrade response\n", stderr);
         return 1;
     }
     response[bytes_read] = '\0';
     if(strncmp(response, "HTTP/1.1 101", 12) != 0){
-        fprintf(stderr, "WebSocket upgrade failed\n");
+        fputs("WebSocket upgrade failed\n", stderr);
         return 1;
     }
     return 0;
@@ -49,7 +49,7 @@ int ws_connect_addrinfo(struct websocket* ws, struct addrinfo* addr_list){
     That's really the reason this function exists, to allow the caller to connect
     multiple sockets without needlessly repeating DNS lookups.*/
     if(https_connect_addrinfo(&ws->https_sock, addr_list)){
-        fprintf(stderr, "Websocket TCP connection failed\n");
+        fputs("Websocket TCP connection failed\n", stderr);
         return 1;
     }
     if(ws_handshake(ws)){//static helper function
@@ -65,7 +65,7 @@ int ws_connect(struct websocket* ws, const char* hostname, const char* port){
     /*Connects the https_socket to the given hostname and port, then performs WebSocket handshake.
     This is the standard connect function, where DNS lookup is performed internally and freed.*/
     if(https_connect(&ws->https_sock, hostname, port)){
-        fprintf(stderr, "Websocket TCP connection failed\n");
+        fputs("Websocket TCP connection failed\n", stderr);
         return 1;
     }
     if(ws_handshake(ws)){//
@@ -78,7 +78,7 @@ int ws_connect(struct websocket* ws, const char* hostname, const char* port){
 int ws_send_text(struct websocket* ws, const char* message){
     size_t payload_len = strlen(message);
     if(payload_len >= 4096){
-        fprintf(stderr, "Payload too large\n");
+        fputs("Payload too large\n", stderr);
         return 1;
     }
     size_t offset = 0;
@@ -87,7 +87,7 @@ int ws_send_text(struct websocket* ws, const char* message){
     size_t frame_size = 6 + payload_len + offset;
     unsigned char* frame = (unsigned char*)malloc(frame_size);
     if(!frame){
-        fprintf(stderr, "Failed to allocate memory for frame\n");
+        fputs("Failed to allocate memory for frame\n", stderr);
         return 1;
     }
     frame[0] = 0x81;
@@ -105,7 +105,7 @@ int ws_send_text(struct websocket* ws, const char* message){
     int write_result = SSL_write(ws->https_sock.ssl, frame, frame_size);
     free(frame);
     if(write_result <= 0){
-        fprintf(stderr, "Failed to send WebSocket frame\n");
+        fputs("Failed to send WebSocket frame\n", stderr);
         return 1;
     }
     return 0;
@@ -114,7 +114,7 @@ int ws_send_text(struct websocket* ws, const char* message){
 struct ws_message* ws_receive(struct websocket* ws){
     struct ws_message* msg = (struct ws_message*)malloc(sizeof(struct ws_message));
     if(!msg){
-        fprintf(stderr, "Failed to allocate memory for ws_message\n");
+        fputs("Failed to allocate memory for ws_message\n", stderr);
         return NULL;
     }
     msg->opcode = 0;
@@ -127,7 +127,7 @@ struct ws_message* ws_receive(struct websocket* ws){
         if(!msg->opcode){
             msg->opcode = header[0] & 0x0F;
             if(msg->opcode == 8){
-                fprintf(stderr, "Received close frame\n");
+                fputs("Received close frame\n", stderr);
                 msg->payload = NULL;
                 msg->payload_len = 0;
                 return msg;
@@ -144,7 +144,7 @@ struct ws_message* ws_receive(struct websocket* ws){
         while(bytes_read < (int)payload_lengths[payload_count]){
             int b_r = SSL_read(ws->https_sock.ssl, payloads[payload_count] + bytes_read, payload_lengths[payload_count] - bytes_read);
             if(b_r <= 0){
-                fprintf(stderr, "Failed to read WebSocket payload\n");
+                fputs("Failed to read WebSocket payload\n", stderr);
                 ws_free_message(msg);
                 for(int i = 0; i < payload_count; i++)
                     free(payloads[i]);
@@ -154,7 +154,7 @@ struct ws_message* ws_receive(struct websocket* ws){
         }
         payload_count++;
         if(payload_count >= 100){
-            fprintf(stderr, "Too many fragmented frames\n");
+            fputs("Too many fragmented frames\n", stderr);
             ws_free_message(msg);
             for(int i = 0; i < payload_count; i++)
                 free(payloads[i]);
@@ -172,7 +172,7 @@ struct ws_message* ws_receive(struct websocket* ws){
         }
         msg->payload = (char*)malloc(total_len + 1);
         if(!msg->payload){
-            fprintf(stderr, "Failed to allocate memory for combined payload\n");
+            fputs("Failed to allocate memory for combined payload\n", stderr);
             for(int i = 0; i < payload_count; i++)
                 free(payloads[i]);
             ws_free_message(msg);

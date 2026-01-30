@@ -98,7 +98,7 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
     struct ws_message* message = ws_receive(&bot->ws);
     if(!message)
         return NULL;
-    if(message->opcode != 1 && message->opcode != 8 || strncmp(message->payload, "{\"op\":11", 8) == 0){
+    if((message->opcode != 1 && message->opcode != 8) || strncmp(message->payload, "{\"op\":11", 8) == 0){
         ws_free_message(message);
         return NULL;
     }
@@ -111,7 +111,7 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
     cJSON* json = cJSON_Parse(message->payload);
     ws_free_message(message);
     if(!json){
-        fprintf(stderr, "Failed to parse event JSON\n");
+        fputs("Failed to parse event JSON\n", stderr);
         free(event);
         return NULL;
     }
@@ -130,7 +130,7 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
         cJSON* content = cJSON_GetObjectItemCaseSensitive(d, "content");
         cJSON* channel_id = cJSON_GetObjectItemCaseSensitive(d, "channel_id");
         if(!content || !channel_id){
-            fprintf(stderr, "Malformed MESSAGE_CREATE event\n");
+            fputs("Malformed MESSAGE_CREATE event\n", stderr);
             cJSON_Delete(json);
             free(event);
             return NULL;
