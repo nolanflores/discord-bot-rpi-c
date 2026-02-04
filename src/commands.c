@@ -187,7 +187,7 @@ void handle_command(struct discord_bot* bot, const char* channel_id, const char*
             res = discord_send_message(bot, channel_id, "https://github.com/nolanflores/discord-bot-rpi-c");
             break;
         case CMD_HELP:
-            res = discord_send_embed(bot, channel_id, "Available Commands", "!sell\\n!buddy\\n!sold\\n!bust\\n!slap\\n!react\\n!pray\\n!whip\\n!tap\\n!nuke\\n!notice\\n!winner\\n!version\\n!repo", 0x192930);
+            res = discord_send_embed(bot, channel_id, "Available Commands", "!sell\\n!buddy\\n!sold\\n!bust\\n!slap\\n!react\\n!pray\\n!whip\\n!tap\\n!nuke\\n!notice\\n!winner\\n!mo\\n!war\\n!version\\n!repo", 0x192930);
             break;
         //Commands with https requests
         case CMD_MO:
