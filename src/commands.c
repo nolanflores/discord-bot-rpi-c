@@ -37,7 +37,63 @@ static int djb2_hash(const char* command){
     return hash;
 }
 
-char* major_order_command(struct discord_bot* bot, const char* channel_id){
+static char* war_command(struct discord_bot* bot, const char* channel_id){
+    struct https_socket sock;
+    if(https_connect(&sock, "helldiverstrainingmanual.com", "443")){
+        return NULL;
+    }
+    char request[512];
+    snprintf(request, 512,
+        "GET /api/v1/war/campaign HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "User-Agent: Cumbot/1.0\r\n"
+        "\r\n",
+        sock.hostname
+    );
+    char* response = https_send(&sock, request);
+    if(!response){
+        https_close(&sock);
+        return NULL;
+    }
+    struct cJSON* json = cJSON_Parse(response);
+    if(!json){
+        free(response);
+        https_close(&sock);
+        return NULL;
+    }
+    int array_size = cJSON_GetArraySize(json);
+    struct cJSON* topFive[5];
+    int divers[5] = {0};
+    for(int i = 0; i < array_size; i++){
+        struct cJSON* item = cJSON_GetArrayItem(json, i);
+        struct cJSON* players = cJSON_GetObjectItemCaseSensitive(item, "players");
+        for(int j = 0; j < 5; j++){
+            if(players->valueint > divers[j]){
+                for(int k = 4; k > j; k--){
+                    divers[k] = divers[k-1];
+                    topFive[k] = topFive[k-1];
+                }
+                divers[j] = players->valueint;
+                topFive[j] = item;
+                break;
+            }
+        }
+    }
+    char message[1024];
+    int message_len = 0;
+    for(int i = 0; i < 5; i++){
+        struct cJSON* name = cJSON_GetObjectItemCaseSensitive(topFive[i], "name");
+        struct cJSON* faction = cJSON_GetObjectItemCaseSensitive(topFive[i], "faction");
+        struct cJSON* percentage = cJSON_GetObjectItemCaseSensitive(topFive[i], "percentage");
+        message_len += snprintf(message + message_len, 1024 - message_len, "%s | %s\\n%d Current Divers\\n%.2f%% Liberated%s", name->valuestring, faction->valuestring, divers[i], percentage->valuedouble, i < 4 ? "\\n\\n" : "");
+    }
+    cJSON_Delete(json);
+    free(response);
+    https_close(&sock);
+    return discord_send_embed(bot, channel_id, "Active Planets", message, 0xFFE900);
+}
+
+static char* major_order_command(struct discord_bot* bot, const char* channel_id){
     struct https_socket sock;
     if(https_connect(&sock, "helldiverstrainingmanual.com", "443")){
         return NULL;
@@ -133,10 +189,16 @@ void handle_command(struct discord_bot* bot, const char* channel_id, const char*
         case CMD_HELP:
             res = discord_send_embed(bot, channel_id, "Available Commands", "!sell\\n!buddy\\n!sold\\n!bust\\n!slap\\n!react\\n!pray\\n!whip\\n!tap\\n!nuke\\n!notice\\n!winner\\n!version\\n!repo", 0x192930);
             break;
+        //Commands with https requests
         case CMD_MO:
             res = major_order_command(bot, channel_id);
             if(!res)
                 res = discord_send_message(bot, channel_id, "Failed to fetch major orders.");
+            break;
+        case CMD_WAR:
+            res = war_command(bot, channel_id);
+            if(!res)
+                res = discord_send_message(bot, channel_id, "Failed to fetch war data.");
             break;
         default:
             break;
