@@ -71,6 +71,8 @@ static int https_tls_connect(struct https_socket* sock){
         return 1;
     }
     SSL_set_fd(sock->ssl, sock->socket_fd);
+    if(sock->hostname)
+        SSL_set_tlsext_host_name(sock->ssl, sock->hostname);
     if(SSL_connect(sock->ssl) != 1){
         fputs("SSL connection failed\n", stderr);
         SSL_free(sock->ssl);

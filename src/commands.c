@@ -37,6 +37,49 @@ static int djb2_hash(const char* command){
     return hash;
 }
 
+char* major_order_command(struct discord_bot* bot, const char* channel_id){
+    struct https_socket sock;
+    if(https_connect(&sock, "helldiverstrainingmanual.com", "443")){
+        return NULL;
+    }
+    char request[512];
+    snprintf(request, 512,
+        "GET /api/v1/war/major-orders HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "User-Agent: Cumbot/1.0\r\n"
+        "\r\n",
+        sock.hostname
+    );
+    char* response = https_send(&sock, request);
+    if(!response){
+        https_close(&sock);
+        return NULL;
+    }
+    struct cJSON* json = cJSON_Parse(response);
+    if(!json){
+        free(response);
+        https_close(&sock);
+        return NULL;
+    }
+    char message[1024];
+    int message_len = 0;
+    int array_size = cJSON_GetArraySize(json);
+    for(int i = 0; i < array_size; i++){
+        struct cJSON* item = cJSON_GetArrayItem(json, i);
+        struct cJSON* setting = cJSON_GetObjectItemCaseSensitive(item, "setting");
+        struct cJSON* overrideTitle = cJSON_GetObjectItemCaseSensitive(setting, "overrideTitle");
+        struct cJSON* overrideBrief = cJSON_GetObjectItemCaseSensitive(setting, "overrideBrief");
+        struct cJSON* expiresIn = cJSON_GetObjectItemCaseSensitive(item, "expiresIn");
+        int days = expiresIn->valueint / 86400;
+        int hours = (expiresIn->valueint % 86400) / 3600;
+        message_len += snprintf(message + message_len, 1024 - message_len, "%s\\n%s\\nExpires in %d days and %d hours.\\n", overrideTitle->valuestring, overrideBrief->valuestring, days, hours);
+    }
+    cJSON_Delete(json);
+    free(response);
+    https_close(&sock);
+    return discord_send_embed(bot, channel_id, "High Command Orders", message, 0xFFE900);
+}
+
 void handle_command(struct discord_bot* bot, const char* channel_id, const char* content){
     content++;//skip '!' prefix
     int hash = djb2_hash(content);
@@ -89,6 +132,11 @@ void handle_command(struct discord_bot* bot, const char* channel_id, const char*
             break;
         case CMD_HELP:
             res = discord_send_embed(bot, channel_id, "Available Commands", "!sell\\n!buddy\\n!sold\\n!bust\\n!slap\\n!react\\n!pray\\n!whip\\n!tap\\n!nuke\\n!notice\\n!winner\\n!version\\n!repo", 0x192930);
+            break;
+        case CMD_MO:
+            res = major_order_command(bot, channel_id);
+            if(!res)
+                res = discord_send_message(bot, channel_id, "Failed to fetch major orders.");
             break;
         default:
             break;
