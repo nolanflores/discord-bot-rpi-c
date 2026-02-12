@@ -1,5 +1,5 @@
-#include "discord.h"
-#include "commands.h"
+#include "core/discord.h"
+#include "bot/commands.h"
 
 
 int main(){

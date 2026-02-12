@@ -1,4 +1,4 @@
-#include "commands.h"
+#include "bot/commands.h"
 
 enum command_hashes{
     CMD_SELL = 2090720021,

@@ -1,9 +1,9 @@
 #ifndef DISCORD_H
 #define DISCORD_H
 
-#include "https_socket.h"
-#include "websocket.h"
-#include "cJSON.h"
+#include "core/https_socket.h"
+#include "core/websocket.h"
+#include "core/cJSON.h"
 #include <pthread.h>
 
 struct discord_bot{

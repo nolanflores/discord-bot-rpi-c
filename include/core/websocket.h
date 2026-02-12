@@ -1,7 +1,7 @@
 #ifndef WEBSOCKET_H
 #define WEBSOCKET_H
 
-#include "https_socket.h"
+#include "core/https_socket.h"
 
 /*
  * Structure representing a WebSocket connection.
