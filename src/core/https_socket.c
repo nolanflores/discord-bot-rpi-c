@@ -176,11 +176,14 @@ static char* https_read_headers(SSL* ssl, char* buffer, size_t* buffer_size, siz
 /*
  * Reads the chunks of a chunked transfer encoded response.
  * Copies the contents of the chunks into a heap allocated string.
+ * This should only be called after the headers have been read.
  * 
  * Returns the allocated string on success, NULL on failure
  */
 static char* https_read_chunked(SSL* ssl, char* buffer, size_t* buffer_size, size_t buffer_capacity, char* body_start){
     while(1){
+        if(memcmp(buffer + *buffer_size - 5, "0\r\n\r\n", 5) == 0)
+            break;
         if(*buffer_size + 8192 >= buffer_capacity){
             fputs("Chunked response too large\n", stderr);
             return NULL;
@@ -192,9 +195,6 @@ static char* https_read_chunked(SSL* ssl, char* buffer, size_t* buffer_size, siz
         }
         *buffer_size += b_r;
         buffer[*buffer_size] = '\0';
-        
-        if(*buffer_size >= 5 && memcmp(buffer + *buffer_size - 5, "0\r\n\r\n", 5) == 0)
-            break;
     }
     
     char* response = (char*)malloc(*buffer_size - (body_start - buffer) + 1);
