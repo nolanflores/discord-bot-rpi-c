@@ -3,6 +3,6 @@
 
 #include "core/discord.h"
 
-void handle_command(struct discord_bot* bot, const char* channel_id, const char* content);
+int handle_command(struct discord_bot* bot, const char* channel_id, const char* content);
 
 #endif
