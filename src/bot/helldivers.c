@@ -104,7 +104,7 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
         int maxHealth = cJSON_GetObjectItemCaseSensitive(planetInfo, "maxHealth")->valueint;
         int owner = cJSON_GetObjectItemCaseSensitive(topPlanets[i], "owner")->valueint;
         int health = cJSON_GetObjectItemCaseSensitive(topPlanets[i], "health")->valueint;
-        message_len += snprintf(message + message_len, 1024 - message_len, "**%s** | *%s*\\n%d Current Divers\\n%.2f%% Liberated\\n\\n", planet_names[topIndexes[i]], factions[owner-1], playerCounts[i], 100.0 - ((100.0 * health) / maxHealth));
+        message_len += snprintf(message + message_len, 1024 - message_len, "**%s** | *%s*\\n%'d Current Divers\\n%.2f%% Liberated\\n\\n", planet_names[topIndexes[i]], factions[owner-1], playerCounts[i], 100.0 - ((100.0 * health) / maxHealth));
     }
     cJSON* spaceStations = cJSON_GetObjectItemCaseSensitive(status, "spaceStations");//i am pretty sure effect id 1238 is orbital blockade
     cJSON* dss = cJSON_GetArrayItem(spaceStations, 0);
@@ -155,8 +155,10 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
         int hours = (expiresIn % 86400) / 3600;
         message_len += snprintf(message + message_len, 2048 - message_len, "**%s**\\n%s\\n\\n", title, brief);
         for(int j = 0; j < numTargets; j++){
-            int progressValue = cJSON_GetArrayItem(progress, j)->valueint;
-            message_len += snprintf(message + message_len, 2048 - message_len, "%d / %d (%.2f%%)\\n", progressValue, targetCounts[j], (100.0 * progressValue) / targetCounts[j]);
+            if(targetCounts[j] > 1){//No need to show 1/1 or 0/1
+                int progressValue = cJSON_GetArrayItem(progress, j)->valueint;
+                message_len += snprintf(message + message_len, 2048 - message_len, "%'d / %'d (%.2f%%)\\n", progressValue, targetCounts[j], (100.0 * progressValue) / targetCounts[j]);
+            }
         }
         message_len += snprintf(message + message_len, 2048 - message_len, "Expires in %d days and %d hours%s", days, hours, i < size - 1 ? "\\n\\n" : "");
     }
@@ -171,7 +173,6 @@ char* helldivers_cyberstan(struct discord_bot* bot, const char* channel_id){
         return NULL;
     char message[1024];
     int message_len = 0;
-    int num_captured = 0;
     cJSON* planetRegions = cJSON_GetObjectItemCaseSensitive(json, "planetRegions");
     int size = cJSON_GetArraySize(planetRegions);
     for(int i = 0; i < size; i++){
@@ -180,14 +181,17 @@ char* helldivers_cyberstan(struct discord_bot* bot, const char* channel_id){
             continue;
         int regionIndex = cJSON_GetObjectItemCaseSensitive(region, "regionIndex")->valueint;
         float health = 100.0f - ((100.0f * cJSON_GetObjectItemCaseSensitive(region, "health")->valueint) / cyberstan_max[regionIndex]);
-        if(health == 100.0f){
-            num_captured++;
+        if(health == 100.0f)
             continue;
-        }
         int players = cJSON_GetObjectItemCaseSensitive(region, "players")->valueint;
         message_len += snprintf(message + message_len, 1024 - message_len, "-# %s MegaFactory\\n**%s**\\n%.2f%% Controlled\\n%d Current Divers\\n\\n", cyberstan_classes[regionIndex], cyberstan_names[regionIndex], health, players);
     }
-    snprintf(message + message_len, 1024 - message_len, "### %d/8 MegaFactories Captured", num_captured);
+    cJSON* globalResources = cJSON_GetObjectItemCaseSensitive(json, "globalResources");
+    cJSON* reserves = cJSON_GetArrayItem(globalResources, 0);
+    int currentValue = cJSON_GetObjectItemCaseSensitive(reserves, "currentValue")->valueint;
+    int maxValue = cJSON_GetObjectItemCaseSensitive(reserves, "maxValue")->valueint;
+    int changePerHour = cJSON_GetObjectItemCaseSensitive(reserves, "changePerSecond")->valueint * 3600;
+    snprintf(message + message_len, 1024 - message_len, "### %'d Forces in Reserve (%.2f%%)\\n-# %'d (%.2f%%) per hour", currentValue, (100.0 * currentValue) / maxValue, changePerHour, (100.0 * changePerHour) / maxValue);
     char* response = discord_send_embed(bot, channel_id, "Battle For Cyberstan", message, 0xFE6A67);
     cJSON_Delete(json);
     return response;

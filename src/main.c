@@ -1,8 +1,10 @@
 #include "core/discord.h"
 #include "bot/commands.h"
+#include <locale.h>
 
 
 int main(){
+    setlocale(LC_NUMERIC, "");
     https_ctx_init();
 
     struct discord_bot bot;
