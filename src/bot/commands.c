@@ -2,29 +2,15 @@
 #include "bot/helldivers.h"
 
 enum command_hashes{
-    CMD_SELL = 2090720021,
-    CMD_BUDDY = 254689437,
-    CMD_SOLD = 2090730903,
-    CMD_BUST = 2090126755,
-    CMD_SLAP = 2090727285,
-    CMD_REACT = 273085876,
-    CMD_PRAY = 2090626017,
-    CMD_WHIP = 2090866941,
-    CMD_TAP = 193506634,
-    CMD_NUKE = 2090557720,
-    CMD_NOTICE = 277905831,
-    CMD_WINNER = 622798744,
+    CMD_SELL = 2090720021, CMD_BUDDY = 254689437, CMD_SOLD = 2090730903,
+    CMD_BUST = 2090126755, CMD_SLAP = 2090727285, CMD_REACT = 273085876,
+    CMD_PRAY = 2090626017, CMD_WHIP = 2090866941, CMD_TAP = 193506634,
+    CMD_NUKE = 2090557720, CMD_NOTICE = 277905831,CMD_WINNER = 622798744,
 
-    CMD_VERSION = 1929407563,
-    CMD_REPO = 2090684219,
-    CMD_HELP = 2090324718,
+    CMD_VERSION = 1929407563, CMD_REPO = 2090684219, CMD_HELP = 2090324718,
 
-    CMD_SLOTS = 274539162,
-    CMD_WAR = 193509903,
-    CMD_MO = 5863617,
-
-    CMD_PORN = 2090623300,
-    CMD_RULE34 = 441269444
+    CMD_WAR = 193509903, CMD_MO = 5863617, CMD_CYBERSTAN = 353245488,
+    CMD_DIVE = 2090185645//dive is not implemented yet
 };
 
 static int djb2_hash(const char* command){
@@ -97,6 +83,9 @@ int handle_command(struct discord_bot* bot, const char* channel_id, const char* 
             break;
         case CMD_WAR:
             response = helldivers_war_summary(bot, channel_id);
+            break;
+        case CMD_CYBERSTAN:
+            response = helldivers_cyberstan(bot, channel_id);
             break;
         default:
             return 0;

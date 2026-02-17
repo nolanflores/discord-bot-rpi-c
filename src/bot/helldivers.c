@@ -23,19 +23,56 @@ static cJSON* helldivers_request(const char* path){
     return json;
 }
 
+static int helldivers_double_request(const char* path1, const char* path2, cJSON** result1, cJSON** result2){
+    struct https_socket sock;
+    if(https_connect(&sock, "api.live.prod.thehelldiversgame.com", "443"))
+        return 1;
+    char request[512];
+    snprintf(request, 512,
+        "GET %s HTTP/1.1\r\n"
+        "Host: api.live.prod.thehelldiversgame.com\r\n"
+        "Accept-Language: en-US\r\n"
+        "\r\n",
+        path1
+    );
+    char* response1 = https_send(&sock, request);
+    if(response1 == NULL){
+        https_close(&sock);
+        return 1;
+    }
+    snprintf(request, 512,
+        "GET %s HTTP/1.1\r\n"
+        "Host: api.live.prod.thehelldiversgame.com\r\n"
+        "Accept-Language: en-US\r\n"
+        "\r\n",
+        path2
+    );
+    char* response2 = https_send(&sock, request);
+    https_close(&sock);
+    if(response2 == NULL){
+        free(response1);
+        return 1;
+    }
+    *result1 = cJSON_Parse(response1);
+    free(response1);
+    *result2 = cJSON_Parse(response2);
+    free(response2);
+    return 0;
+}
+
 char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
-    cJSON* status = helldivers_request("/api/WarSeason/801/Status");
-    if(status == NULL){
+    cJSON* status = NULL;
+    cJSON* info = NULL;
+    if(helldivers_double_request("/api/WarSeason/801/Status", "/api/WarSeason/801/WarInfo", &status, &info))
         return NULL;
-    }
-    cJSON* info = helldivers_request("/api/WarSeason/801/WarInfo");
-    if(info == NULL){
+    if(status == NULL || info == NULL){
         cJSON_Delete(status);
+        cJSON_Delete(info);
         return NULL;
     }
-    cJSON* topPlanets[5];
-    int playerCounts[5] = {0};
-    int topIndexes[5] = {0};
+    cJSON* topPlanets[3];
+    int playerCounts[3] = {0};
+    int topIndexes[3] = {0};
     cJSON* planetStatus = cJSON_GetObjectItemCaseSensitive(status, "planetStatus");
     int size = cJSON_GetArraySize(planetStatus);
     for(int i = 0; i < size; i++){
@@ -43,7 +80,7 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
         int players = cJSON_GetObjectItemCaseSensitive(planet, "players")->valueint;
         if(playerCounts[0] < players){
             int index = 0;
-            for(int j = 1; j < 5; j++){
+            for(int j = 1; j < 3; j++){
                 if(playerCounts[j] < players)
                     index = j;
                 else
@@ -62,13 +99,23 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
     cJSON* planetInfos = cJSON_GetObjectItemCaseSensitive(info, "planetInfos");
     char message[1024];
     int message_len = 0;
-    for(int i = 4; i >= 0; i--){
+    for(int i = 2; i >= 0; i--){
         cJSON* planetInfo = cJSON_GetArrayItem(planetInfos, topIndexes[i]);
         int maxHealth = cJSON_GetObjectItemCaseSensitive(planetInfo, "maxHealth")->valueint;
         int owner = cJSON_GetObjectItemCaseSensitive(topPlanets[i], "owner")->valueint;
         int health = cJSON_GetObjectItemCaseSensitive(topPlanets[i], "health")->valueint;
-        message_len += snprintf(message + message_len, 1024 - message_len, "%s | %s\\n%d Current Divers\\n%.2f%% Liberated%s", planet_names[topIndexes[i]], factions[owner-1], playerCounts[i], 100.0 - ((100.0 * health) / maxHealth), i > 0 ? "\\n\\n" : "");
+        message_len += snprintf(message + message_len, 1024 - message_len, "**%s** | *%s*\\n%d Current Divers\\n%.2f%% Liberated\\n\\n", planet_names[topIndexes[i]], factions[owner-1], playerCounts[i], 100.0 - ((100.0 * health) / maxHealth));
     }
+    cJSON* spaceStations = cJSON_GetObjectItemCaseSensitive(status, "spaceStations");//i am pretty sure effect id 1238 is orbital blockade
+    cJSON* dss = cJSON_GetArrayItem(spaceStations, 0);
+    int dssLocation = cJSON_GetObjectItemCaseSensitive(dss, "planetIndex")->valueint;
+    cJSON* dssPlanet = cJSON_GetArrayItem(planetStatus, dssLocation);
+    int dssOwner = cJSON_GetObjectItemCaseSensitive(dssPlanet, "owner")->valueint;
+    int wartime = cJSON_GetObjectItemCaseSensitive(status, "time")->valueint;
+    int dsstime = cJSON_GetObjectItemCaseSensitive(dss, "currentElectionEndWarTime")->valueint;
+    int hours = (dsstime - wartime) / 3600;
+    int minutes = ((dsstime - wartime) % 3600) / 60;
+    message_len += snprintf(message + message_len, 1024 - message_len, "### Democracy Space Station\\n**%s** | *%s*\\nNext FTL Jump in %dH %dM", planet_names[dssLocation], factions[dssOwner-1], hours, minutes);
     char* response = discord_send_embed(bot, channel_id, "Active Planets", message, 0xFFE900);
     cJSON_Delete(status);
     cJSON_Delete(info);
@@ -106,7 +153,7 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
         }
         int days = expiresIn / 86400;
         int hours = (expiresIn % 86400) / 3600;
-        message_len += snprintf(message + message_len, 2048 - message_len, "### %s\\n%s\\n\\n", title, brief);
+        message_len += snprintf(message + message_len, 2048 - message_len, "**%s**\\n%s\\n\\n", title, brief);
         for(int j = 0; j < numTargets; j++){
             int progressValue = cJSON_GetArrayItem(progress, j)->valueint;
             message_len += snprintf(message + message_len, 2048 - message_len, "%d / %d (%.2f%%)\\n", progressValue, targetCounts[j], (100.0 * progressValue) / targetCounts[j]);
@@ -114,6 +161,34 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
         message_len += snprintf(message + message_len, 2048 - message_len, "Expires in %d days and %d hours%s", days, hours, i < size - 1 ? "\\n\\n" : "");
     }
     char* response = discord_send_embed(bot, channel_id, "High Command Orders", message, 0xFFE900);
+    cJSON_Delete(json);
+    return response;
+}
+
+char* helldivers_cyberstan(struct discord_bot* bot, const char* channel_id){
+    cJSON* json = helldivers_request("/api/WarSeason/801/Status");
+    if(json == NULL)
+        return NULL;
+    char message[1024];
+    int message_len = 0;
+    int num_captured = 0;
+    cJSON* planetRegions = cJSON_GetObjectItemCaseSensitive(json, "planetRegions");
+    int size = cJSON_GetArraySize(planetRegions);
+    for(int i = 0; i < size; i++){
+        cJSON* region = cJSON_GetArrayItem(planetRegions, i);
+        if(cJSON_GetObjectItemCaseSensitive(region, "planetIndex")->valueint != 260)
+            continue;
+        int regionIndex = cJSON_GetObjectItemCaseSensitive(region, "regionIndex")->valueint;
+        float health = 100.0f - ((100.0f * cJSON_GetObjectItemCaseSensitive(region, "health")->valueint) / cyberstan_max[regionIndex]);
+        if(health == 100.0f){
+            num_captured++;
+            continue;
+        }
+        int players = cJSON_GetObjectItemCaseSensitive(region, "players")->valueint;
+        message_len += snprintf(message + message_len, 1024 - message_len, "-# %s MegaFactory\\n**%s**\\n%.2f%% Controlled\\n%d Current Divers\\n\\n", cyberstan_classes[regionIndex], cyberstan_names[regionIndex], health, players);
+    }
+    snprintf(message + message_len, 1024 - message_len, "### %d/8 MegaFactories Captured", num_captured);
+    char* response = discord_send_embed(bot, channel_id, "Battle For Cyberstan", message, 0xFE6A67);
     cJSON_Delete(json);
     return response;
 }

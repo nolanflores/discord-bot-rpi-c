@@ -26,3 +26,14 @@ const char* planet_names[267] = {
 
 
 const char* factions[4] = {"Super Earth", "Terminids", "Automatons", "Illuminate"};
+
+
+const char* cyberstan_names[8] = {
+    "Transcendence", "Autonomy", "Star Kield", "Omniparitus",
+    "Solidaritet", "Ursoot Nine", "Lurza", "Camrat For"
+};
+const char* cyberstan_classes[8] = {
+    "Cyborg Capital", "Class 1", "Class 3", "Class 2",
+    "Class 1", "Class 3", "Class 2", "Class 2"
+};
+const int cyberstan_max[8] = {2000000, 1000000, 1500000, 1250000, 1000000, 1500000, 1250000, 1250000};
