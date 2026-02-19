@@ -162,7 +162,7 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
         }
         message_len += snprintf(message + message_len, 2048 - message_len, "Expires in %d days and %d hours%s", days, hours, i < size - 1 ? "\\n\\n" : "");
     }
-    char* response = discord_send_embed(bot, channel_id, "High Command Orders", message, 0xFFE900);
+    char* response = discord_send_embed(bot, channel_id, "High Command Orders", message, 0x016AB5);
     cJSON_Delete(json);
     return response;
 }
