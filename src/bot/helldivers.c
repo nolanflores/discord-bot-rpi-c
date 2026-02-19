@@ -184,7 +184,7 @@ char* helldivers_cyberstan(struct discord_bot* bot, const char* channel_id){
         if(health == 100.0f)
             continue;
         int players = cJSON_GetObjectItemCaseSensitive(region, "players")->valueint;
-        message_len += snprintf(message + message_len, 1024 - message_len, "-# %s MegaFactory\\n**%s**\\n%.2f%% Controlled\\n%d Current Divers\\n\\n", cyberstan_classes[regionIndex], cyberstan_names[regionIndex], health, players);
+        message_len += snprintf(message + message_len, 1024 - message_len, "-# %s MegaFactory\\n**%s**\\n%.2f%% Controlled\\n%'d Current Divers\\n\\n", cyberstan_classes[regionIndex], cyberstan_names[regionIndex], health, players);
     }
     cJSON* globalResources = cJSON_GetObjectItemCaseSensitive(json, "globalResources");
     cJSON* reserves = cJSON_GetArrayItem(globalResources, 0);
