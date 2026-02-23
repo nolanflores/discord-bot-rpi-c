@@ -85,7 +85,8 @@ int handle_command(struct discord_bot* bot, const char* channel_id, const char* 
             response = helldivers_war_summary(bot, channel_id);
             break;
         case CMD_CYBERSTAN:
-            response = helldivers_cyberstan(bot, channel_id);
+            //response = helldivers_cyberstan(bot, channel_id);
+            response = discord_send_message(bot, channel_id, "It's Joe Over.");
             break;
         default:
             return 0;

@@ -107,15 +107,19 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
         message_len += snprintf(message + message_len, 1024 - message_len, "**%s** | *%s*\\n%'d Current Divers\\n%.2f%% Liberated\\n\\n", planet_names[topIndexes[i]], factions[owner-1], playerCounts[i], 100.0 - ((100.0 * health) / maxHealth));
     }
     cJSON* spaceStations = cJSON_GetObjectItemCaseSensitive(status, "spaceStations");//i am pretty sure effect id 1238 is orbital blockade
-    cJSON* dss = cJSON_GetArrayItem(spaceStations, 0);
-    int dssLocation = cJSON_GetObjectItemCaseSensitive(dss, "planetIndex")->valueint;
-    cJSON* dssPlanet = cJSON_GetArrayItem(planetStatus, dssLocation);
-    int dssOwner = cJSON_GetObjectItemCaseSensitive(dssPlanet, "owner")->valueint;
-    int wartime = cJSON_GetObjectItemCaseSensitive(status, "time")->valueint;
-    int dsstime = cJSON_GetObjectItemCaseSensitive(dss, "currentElectionEndWarTime")->valueint;
-    int hours = (dsstime - wartime) / 3600;
-    int minutes = ((dsstime - wartime) % 3600) / 60;
-    message_len += snprintf(message + message_len, 1024 - message_len, "### Democracy Space Station\\n**%s** | *%s*\\nNext FTL Jump in %dH %dM", planet_names[dssLocation], factions[dssOwner-1], hours, minutes);
+    if(cJSON_GetArraySize(spaceStations) > 0){
+        cJSON* dss = cJSON_GetArrayItem(spaceStations, 0);
+        int dssLocation = cJSON_GetObjectItemCaseSensitive(dss, "planetIndex")->valueint;
+        cJSON* dssPlanet = cJSON_GetArrayItem(planetStatus, dssLocation);
+        int dssOwner = cJSON_GetObjectItemCaseSensitive(dssPlanet, "owner")->valueint;
+        int wartime = cJSON_GetObjectItemCaseSensitive(status, "time")->valueint;
+        int dsstime = cJSON_GetObjectItemCaseSensitive(dss, "currentElectionEndWarTime")->valueint;
+        int hours = (dsstime - wartime) / 3600;
+        int minutes = ((dsstime - wartime) % 3600) / 60;
+        message_len += snprintf(message + message_len, 1024 - message_len, "### Democracy Space Station\\n**%s** | *%s*\\nNext FTL Jump in %dH %dM", planet_names[dssLocation], factions[dssOwner-1], hours, minutes);
+    }else{
+        message_len += snprintf(message + message_len, 1024 - message_len, "### Democracy Space Station\\nDSS Not Currently Available");
+    }
     char* response = discord_send_embed(bot, channel_id, "Active Planets", message, 0xFFE900);
     cJSON_Delete(status);
     cJSON_Delete(info);
@@ -126,9 +130,13 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
     cJSON* json = helldivers_request("/api/v2/Assignment/War/801");
     if(json == NULL)
         return NULL;
-    int size = cJSON_GetArraySize(json);
     char message[2048];
     int message_len = 0;
+    int size = cJSON_GetArraySize(json);
+    if(size == 0){
+        cJSON_Delete(json);
+        return discord_send_embed(bot, channel_id, "High Command Orders", "Awaiting new orders.", 0x016AB5);
+    }
     for(int i = 0; i < size; i++){
         cJSON* order = cJSON_GetArrayItem(json, i);
         cJSON* progress = cJSON_GetObjectItemCaseSensitive(order, "progress");
