@@ -70,6 +70,7 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
         cJSON_Delete(info);
         return NULL;
     }
+    int wartime = cJSON_GetObjectItemCaseSensitive(status, "time")->valueint;
     cJSON* topPlanets[3];
     int playerCounts[3] = {0};
     int topIndexes[3] = {0};
@@ -100,11 +101,31 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
     char message[1024];
     int message_len = 0;
     for(int i = 2; i >= 0; i--){
-        cJSON* planetInfo = cJSON_GetArrayItem(planetInfos, topIndexes[i]);
-        int maxHealth = cJSON_GetObjectItemCaseSensitive(planetInfo, "maxHealth")->valueint;
         int owner = cJSON_GetObjectItemCaseSensitive(topPlanets[i], "owner")->valueint;
-        int health = cJSON_GetObjectItemCaseSensitive(topPlanets[i], "health")->valueint;
-        message_len += snprintf(message + message_len, 1024 - message_len, "**%s** | *%s*\\n%'d Current Divers\\n%.2f%% Liberated\\n\\n", planet_names[topIndexes[i]], factions[owner-1], playerCounts[i], 100.0 - ((100.0 * health) / maxHealth));
+        if(owner == 1){
+            cJSON* planetEvents = cJSON_GetObjectItemCaseSensitive(status, "planetEvents");
+            int eventSize = cJSON_GetArraySize(planetEvents);
+            for(int j = 0; j < eventSize; j++){
+                cJSON* event = cJSON_GetArrayItem(planetEvents, j);
+                int eventId = cJSON_GetObjectItemCaseSensitive(event, "planetIndex")->valueint;
+                if(eventId == topIndexes[i]){
+                    int race = cJSON_GetObjectItemCaseSensitive(event, "race")->valueint;
+                    int health = cJSON_GetObjectItemCaseSensitive(event, "health")->valueint;
+                    int maxHealth = cJSON_GetObjectItemCaseSensitive(event, "maxHealth")->valueint;
+                    int expireTime = cJSON_GetObjectItemCaseSensitive(event, "expireTime")->valueint;
+                    int hours = (expireTime - wartime) / 3600;
+                    int minutes = ((expireTime - wartime) % 3600) / 60;
+                    float defendedPercent = 100.0f * (maxHealth - health) / maxHealth;
+                    message_len += snprintf(message + message_len, 1024 - message_len, "**%s** | *%s*\\n%'d Current Divers\\n%.2f%% Defended\\n%dH %dM Remaining\\n\\n", planet_names[topIndexes[i]], factions[race-1], playerCounts[i], defendedPercent, hours, minutes);
+                    break;
+                }
+            }
+        }else{
+            cJSON* planetInfo = cJSON_GetArrayItem(planetInfos, topIndexes[i]);
+            int maxHealth = cJSON_GetObjectItemCaseSensitive(planetInfo, "maxHealth")->valueint;
+            int health = cJSON_GetObjectItemCaseSensitive(topPlanets[i], "health")->valueint;
+            message_len += snprintf(message + message_len, 1024 - message_len, "**%s** | *%s*\\n%'d Current Divers\\n%.2f%% Liberated\\n\\n", planet_names[topIndexes[i]], factions[owner-1], playerCounts[i], 100.0 - ((100.0 * health) / maxHealth));
+        }
     }
     cJSON* spaceStations = cJSON_GetObjectItemCaseSensitive(status, "spaceStations");//i am pretty sure effect id 1238 is orbital blockade
     if(cJSON_GetArraySize(spaceStations) > 0){
@@ -112,7 +133,6 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
         int dssLocation = cJSON_GetObjectItemCaseSensitive(dss, "planetIndex")->valueint;
         cJSON* dssPlanet = cJSON_GetArrayItem(planetStatus, dssLocation);
         int dssOwner = cJSON_GetObjectItemCaseSensitive(dssPlanet, "owner")->valueint;
-        int wartime = cJSON_GetObjectItemCaseSensitive(status, "time")->valueint;
         int dsstime = cJSON_GetObjectItemCaseSensitive(dss, "currentElectionEndWarTime")->valueint;
         int hours = (dsstime - wartime) / 3600;
         int minutes = ((dsstime - wartime) % 3600) / 60;
@@ -135,7 +155,7 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
     int size = cJSON_GetArraySize(json);
     if(size == 0){
         cJSON_Delete(json);
-        return discord_send_embed(bot, channel_id, "High Command Orders", "Awaiting new orders.", 0x016AB5);
+        return discord_send_embed(bot, channel_id, "High Command Orders", "Awaiting Next Orders", 0x016AB5);
     }
     for(int i = 0; i < size; i++){
         cJSON* order = cJSON_GetArrayItem(json, i);
