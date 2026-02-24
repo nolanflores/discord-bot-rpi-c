@@ -29,18 +29,6 @@ struct ws_message{
 /*
  * Establishes a TCP/TLS socket connection.
  * Then performs the WebSocket upgrade handshake.
- * Closes the socket on failure.
- * 
- * This function takes an addrinfo list obtained from https_dns_lookup,
- * allowing the caller to control the lifetime of the addrinfo list.
- * 
- * Returns 0 on success, 1 on failure.
- */
-int ws_connect_addrinfo(struct websocket* ws, struct addrinfo* addr_list);
-
-/*
- * Establishes a TCP/TLS socket connection.
- * Then performs the WebSocket upgrade handshake.
  * Closes the TCP socket on failure.
  * 
  * This function performs the DNS lookup internally.

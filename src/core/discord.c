@@ -3,6 +3,11 @@
 #include <time.h>
 #include <netdb.h>
 
+/*
+ * This function runs in a loop, sleeping for the specified heartbeat interval,
+ * and sending a heartbeat message to the Gateway each time.
+ * The loop can be exited by setting the heartbeat_interval to 0 and signaling the condition variable.
+ */
 static void* heartbeat_loop(void* arg){
     struct discord_bot* bot = (struct discord_bot*)arg;
 
@@ -40,18 +45,24 @@ static void* heartbeat_loop(void* arg){
     return NULL;
 }
 
+
+/* ============================================================================
+ * Public Functions
+ * ============================================================================
+*/
+
+
 int discord_init(struct discord_bot* bot){
-    bot->rest_api = https_dns_lookup("discord.com", "443");
-    if(!bot->rest_api)
+    if(https_connect(&bot->rest_api, "discord.com", "443"))
         return 1;
     if(ws_connect(&bot->ws, "gateway.discord.gg", "443")){
-        freeaddrinfo(bot->rest_api);
+        https_close(&bot->rest_api);
         return 1;
     }
     
     struct ws_message* msg = ws_receive(&bot->ws);
     if(!msg){
-        freeaddrinfo(bot->rest_api);
+        https_close(&bot->rest_api);
         ws_close(&bot->ws);
         return 1;
     }
@@ -66,7 +77,7 @@ int discord_init(struct discord_bot* bot){
         pthread_cond_init(&bot->cond, NULL) ||
         pthread_create(&bot->heartbeat_thread, NULL, heartbeat_loop, bot)
     ){
-        freeaddrinfo(bot->rest_api);
+        https_close(&bot->rest_api);
         ws_close(&bot->ws);
         return 1;
     }
@@ -93,6 +104,8 @@ int discord_init(struct discord_bot* bot){
     pthread_mutex_unlock(&bot->mutex);
     return 0;
 }
+
+
 
 struct discord_event* discord_receive_event(struct discord_bot* bot){
     struct ws_message* message = ws_receive(&bot->ws);
@@ -157,6 +170,8 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
     return event;
 }
 
+
+
 void discord_free_event(struct discord_event* event){
     if(event){
         if(event->json)
@@ -165,15 +180,14 @@ void discord_free_event(struct discord_event* event){
     }
 }
 
+
+
 static char* discord_send(struct discord_bot* bot, const char* request){
-    struct https_socket hs;
-    if(https_connect_addrinfo(&hs, bot->rest_api)){
-        return NULL;
-    }
-    char* response = https_send(&hs, request);
-    https_close(&hs);
+    char* response = https_send(&bot->rest_api, request);
     return response;
 }
+
+
 
 char* discord_send_message(struct discord_bot* bot, const char* channel_id, const char* content){
     char request[8192];
@@ -192,6 +206,8 @@ char* discord_send_message(struct discord_bot* bot, const char* channel_id, cons
     );
     return discord_send(bot, request);
 }
+
+
 
 char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const char* title, const char* description, const int color_hex){
     char content[6144];
@@ -217,6 +233,8 @@ char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const 
     return discord_send(bot, request);
 }
 
+
+
 void discord_cleanup(struct discord_bot* bot){
     pthread_mutex_lock(&bot->mutex);
     bot->heartbeat_interval = 0;
@@ -225,5 +243,5 @@ void discord_cleanup(struct discord_bot* bot){
     pthread_join(bot->heartbeat_thread, NULL);
     pthread_mutex_destroy(&bot->mutex);
     ws_close(&bot->ws);
-    freeaddrinfo(bot->rest_api);
+    https_close(&bot->rest_api);
 }

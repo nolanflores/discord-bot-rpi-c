@@ -14,24 +14,45 @@
 static SSL_CTX* ssl_ctx = NULL;
 
 /*
+ * Static helper function for performing an IPv4 DNS lookup for the given hostname and port.
+ * 
+ * Returns a pointer to a linked list of addrinfo structures on success,
+ * or NULL on failure.
+ * The returned addrinfo list must be freed with freeaddrinfo when no longer needed.
+ */
+static struct addrinfo* https_dns_lookup(const char* hostname, const char* port){
+    struct addrinfo* addr_list = NULL;
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_CANONNAME;
+    hints.ai_protocol = 0;
+    if(getaddrinfo(hostname, port, &hints, &addr_list) == 0)
+        return addr_list;
+    fputs("Failed to get address info\n", stderr);
+    return NULL;
+}
+
+/*
  * Static helper function for establishing a TCP connection
- * Does not free the addrinfo list.
- * Sets the https_socket hostname to the canonical name of the first address in the list.
+ * Calls the DNS lookup for the given hostname and port.
+ * Then connects the socket and frees the addrinfo list.
+ * Closes the socket, frees the hostname and port on fail.
  * 
  * Returns 0 on success, 1 on failure.
  */
-static int https_tcp_connect_addrinfo(struct https_socket* sock, struct addrinfo* addr_list){
-    if(!addr_list){
-        fputs("Address info is NULL\n", stderr);
+static int https_tcp_connect(struct https_socket* sock, const char* hostname, const char* port){
+    struct addrinfo* addr_list = https_dns_lookup(hostname, port);
+    if(addr_list == NULL)
         return 1;
-    }
     sock->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(sock->socket_fd == -1){
         fputs("Failed to create socket\n", stderr);
         return 1;
     }
+    sock->hostname = strdup(addr_list->ai_canonname);
+    sock->port = strdup(port);
     struct addrinfo* ptr = addr_list;
-    sock->hostname = strdup(ptr->ai_canonname);
     while(ptr != NULL){
         int connection_result = connect(sock->socket_fd, ptr->ai_addr, ptr->ai_addrlen);
         if(connection_result == 0)
@@ -40,21 +61,9 @@ static int https_tcp_connect_addrinfo(struct https_socket* sock, struct addrinfo
     }
     fputs("Failed to connect to address\n", stderr);
     close(sock->socket_fd);
+    free(sock->hostname);
+    free(sock->port);
     return 1;
-}
-
-/*
- * Static helper function for establishing a TCP connection
- * Performs the DNS lookup for the given hostname.
- * Then connects the socket and frees the addrinfo list.
- * 
- * Returns 0 on success, 1 on failure.
- */
-static int https_tcp_connect(struct https_socket* sock, const char* hostname, const char* port){
-    struct addrinfo* addr_list = https_dns_lookup(hostname, port);
-    int connect_result = https_tcp_connect_addrinfo(sock, addr_list);
-    freeaddrinfo(addr_list);
-    return connect_result;
 }
 
 /*
@@ -73,15 +82,34 @@ static int https_tls_connect(struct https_socket* sock){
     SSL_set_fd(sock->ssl, sock->socket_fd);
     if(sock->hostname)
         SSL_set_tlsext_host_name(sock->ssl, sock->hostname);
+    sock->session = NULL;
+    SSL_set_session(sock->ssl, sock->session);
     if(SSL_connect(sock->ssl) != 1){
         fputs("SSL connection failed\n", stderr);
         SSL_free(sock->ssl);
         close(sock->socket_fd);
         return 1;
     }
+    SSL_SESSION_free(sock->session);
+    sock->session = SSL_get1_session(sock->ssl);
     return 0;
 }
 
+
+static int https_reconnect(struct https_socket* sock){
+    SSL_shutdown(sock->ssl);
+    SSL_free(sock->ssl);
+    close(sock->socket_fd);
+    if(https_tcp_connect(sock, sock->hostname, sock->port)){
+        fputs("Failed to reconnect TCP socket\n", stderr);
+        return 1;
+    }
+    if(https_tls_connect(sock)){
+        fputs("Failed to reconnect TLS socket\n", stderr);
+        return 1;
+    }
+    return 0;
+}
 
 
 int https_ctx_init(){
@@ -91,36 +119,11 @@ int https_ctx_init(){
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
     ssl_ctx = SSL_CTX_new(TLS_client_method());
-    if(ssl_ctx)
-        return 0;
-    fputs("Failed to initialize SSL context\n", stderr);
-    return 1;
-}
-
-
-
-struct addrinfo* https_dns_lookup(const char* hostname, const char* port){
-    struct addrinfo* addr_list = NULL;
-    struct addrinfo hints = {0};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_CANONNAME;
-    hints.ai_protocol = 0;
-    int result = getaddrinfo(hostname, port, &hints, &addr_list);
-    if(result != 0){
-        fputs("Failed to get address info\n", stderr);
-        return NULL;
+    if(!ssl_ctx){
+        fputs("Failed to initialize SSL context\n", stderr);
+        return 1;
     }
-    return addr_list;
-}
-
-
-
-int https_connect_addrinfo(struct https_socket* sock, struct addrinfo* addr_list){
-    if(https_tcp_connect_addrinfo(sock, addr_list))
-        return 1;
-    if(https_tls_connect(sock))
-        return 1;
+    SSL_CTX_set_session_cache_mode(ssl_ctx, SSL_SESS_CACHE_CLIENT);
     return 0;
 }
 
@@ -133,6 +136,7 @@ int https_connect(struct https_socket* sock, const char* hostname, const char* p
         return 1;
     return 0;
 }
+
 
 
 /*
@@ -264,8 +268,15 @@ static char* https_read_content_length(SSL* ssl, char* buffer, size_t* buffer_si
 
 char* https_send(struct https_socket* sock, const char* data){
     if(SSL_write(sock->ssl, data, strlen(data)) <= 0){
-        fputs("Failed to send request\n", stderr);
-        return NULL;
+        fputs("Failed to send request, attempting to reconnect\n", stderr);
+        if(https_reconnect(sock)){
+            fputs("Reconnection failed\n", stderr);
+            return NULL;
+        }
+        if(SSL_write(sock->ssl, data, strlen(data)) <= 0){
+            fputs("Failed to send request after reconnecting\n", stderr);
+            return NULL;
+        }
     }
     
     char buffer[64 * 8192];
@@ -306,8 +317,14 @@ void https_close(struct https_socket* sock){
     if(sock->socket_fd != -1){
         close(sock->socket_fd);
     }
+    if(sock->session){
+        SSL_SESSION_free(sock->session);
+        sock->session = NULL;
+    }
     free(sock->hostname);
+    free(sock->port);
     sock->hostname = NULL;
+    sock->port = NULL;
 }
 
 

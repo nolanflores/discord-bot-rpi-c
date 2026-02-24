@@ -9,7 +9,7 @@
 /*
  * Structure representing an active Discord bot connection.
  * 
- * rest_api: The addrinfo list for the Discord REST API endpoint.
+ * rest_api: The HTTPS socket connected to the Discord REST API.
  * ws: The websocket connected to the Discord Gateway.
  * heartbeat_thread: The thread responsible for sending heartbeat messages to the Gateway.
  * mutex: Mutex for synchronizing access to shared bot state.
@@ -18,7 +18,7 @@
  * event_s: The "s" field from the most recent Gateway event, used for heartbeats.
  */
 struct discord_bot{
-    struct addrinfo* rest_api;
+    struct https_socket rest_api;
     struct websocket ws;
     pthread_t heartbeat_thread;
     pthread_mutex_t mutex;
