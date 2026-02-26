@@ -42,38 +42,25 @@ static int ws_handshake(struct websocket* ws){
     return 0;
 }
 
-
-
-int ws_connect_addrinfo(struct websocket* ws, struct addrinfo* addr_list){
-    /*Reminder that https_connect_addrinfo does not free the addrinfo list.
-    That's really the reason this function exists, to allow the caller to connect
-    multiple sockets without needlessly repeating DNS lookups.*/
-    if(https_connect_addrinfo(&ws->https_sock, addr_list)){
-        fputs("Websocket TCP connection failed\n", stderr);
-        return 1;
-    }
-    if(ws_handshake(ws)){//static helper function
-        https_close(&ws->https_sock);
-        return 1;
-    }
-    return 0;
-}
-
+/* ============================================================================
+ * Public Functions
+ * ============================================================================
+*/ 
 
 
 int ws_connect(struct websocket* ws, const char* hostname, const char* port){
-    /*Connects the https_socket to the given hostname and port, then performs WebSocket handshake.
-    This is the standard connect function, where DNS lookup is performed internally and freed.*/
     if(https_connect(&ws->https_sock, hostname, port)){
         fputs("Websocket TCP connection failed\n", stderr);
         return 1;
     }
-    if(ws_handshake(ws)){//
+    if(ws_handshake(ws)){
         https_close(&ws->https_sock);
         return 1;
     }
     return 0;
 }
+
+
 
 int ws_send_text(struct websocket* ws, const char* message){
     size_t payload_len = strlen(message);
@@ -110,6 +97,8 @@ int ws_send_text(struct websocket* ws, const char* message){
     }
     return 0;
 }
+
+
 
 struct ws_message* ws_receive(struct websocket* ws){
     struct ws_message* msg = (struct ws_message*)malloc(sizeof(struct ws_message));
@@ -190,11 +179,15 @@ struct ws_message* ws_receive(struct websocket* ws){
     return msg;
 }
 
+
+
 void ws_free_message(struct ws_message* msg){
     if(msg)
         free(msg->payload);
     free(msg);
 }
+
+
 
 void ws_close(struct websocket* ws){
     if(ws->https_sock.ssl){

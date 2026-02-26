@@ -7,13 +7,17 @@
  * Structure representing an HTTPS socket connection.
  * 
  * hostname: The canonical name of the connected server.
+ * port: The port number as a string.
  * socket_fd: The file descriptor of the TCP socket.
  * ssl: The SSL structure for the TLS connection.
+ * session: The SSL session for session resumption.
  */
 struct https_socket{
     char* hostname;
+    char* port;
     int socket_fd;
     SSL* ssl;
+    SSL_SESSION* session;
 };
 
 /*
@@ -26,32 +30,9 @@ struct https_socket{
 int https_ctx_init();
 
 /*
- * Performs an IPv4 DNS lookup for the given hostname and port.
- * 
- * Returns a pointer to a linked list of addrinfo structures on success,
- * or NULL on failure.
- * The returned addrinfo list must be freed with freeaddrinfo when no longer needed.
- */
-struct addrinfo* https_dns_lookup(const char* hostname, const char* port);
-
-/*
- * Establishes a TCP/TLS socket connection.
- * Closes the socket on failure.
- * Alloctes and sets the hostname field of the https_socket.
- * 
- * This function takes an addrinfo list obtained from https_dns_lookup,
- * allowing the caller to control the lifetime of the addrinfo list.
- * 
- * Returns 0 on success, 1 on failure.
- */
-int https_connect_addrinfo(struct https_socket* sock, struct addrinfo* addr_list);
-
-/*
  * Establishes a TCP/TLS socket connection.
  * Closes the TCP socket on failure.
- * Allocates and sets the hostname field of the https_socket.
- * 
- * This function performs the DNS lookup internally.
+ * Allocates and sets the hostname and port fields of the https_socket.
  * 
  * Returns 0 on success, 1 on failure.
  */
