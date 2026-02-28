@@ -100,7 +100,9 @@ static int https_reconnect(struct https_socket* sock){
     SSL_shutdown(sock->ssl);
     SSL_free(sock->ssl);
     close(sock->socket_fd);
-    if(https_tcp_connect(sock, sock->hostname, sock->port)){
+    char* old_hostname = sock->hostname;
+    char* old_port = sock->port;
+    if(https_tcp_connect(sock, old_hostname, old_port)){
         fputs("Failed to reconnect TCP socket\n", stderr);
         return 1;
     }
@@ -108,6 +110,8 @@ static int https_reconnect(struct https_socket* sock){
         fputs("Failed to reconnect TLS socket\n", stderr);
         return 1;
     }
+    free(old_hostname);
+    free(old_port);
     return 0;
 }
 
@@ -277,6 +281,7 @@ char* https_send(struct https_socket* sock, const char* data){
             fputs("Failed to send request after reconnecting\n", stderr);
             return NULL;
         }
+        fputs("Reconnected successfully\n", stderr);
     }
     
     char buffer[64 * 8192];
