@@ -287,8 +287,22 @@ char* https_send(struct https_socket* sock, const char* data){
     char buffer[64 * 8192];
     size_t buffer_size = 0;
     char* header_end = https_read_headers(sock->ssl, buffer, &buffer_size, sizeof(buffer));
-    if(!header_end){
-        return NULL;
+    if(header_end == NULL){
+        fputs("Connection may be stale, attempting to reconnect\n", stderr);
+        buffer_size = 0;
+        if(https_reconnect(sock)){
+            fputs("Reconnection failed\n", stderr);
+            return NULL;
+        }
+        if(SSL_write(sock->ssl, data, strlen(data)) <= 0){
+            fputs("Failed to send request after reconnecting\n", stderr);
+            return NULL;
+        }
+        header_end = https_read_headers(sock->ssl, buffer, &buffer_size, sizeof(buffer));
+        if(!header_end){
+            fputs("Failed to read headers after reconnecting\n", stderr);
+            return NULL;
+        }
     }
     
     //chunked encoding
