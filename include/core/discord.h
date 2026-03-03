@@ -51,6 +51,8 @@ struct discord_event{
 
 int discord_init(struct discord_bot* bot);
 
+char* discord_send_raw(struct discord_bot* bot, const char* channel_id, const char* raw_json);
+
 char* discord_send_message(struct discord_bot* bot, const char* channel, const char* content);
 
 char* discord_send_embed(struct discord_bot* bot, const char* channel, const char* title, const char* description, const int color_hex);
