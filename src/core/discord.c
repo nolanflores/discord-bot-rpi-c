@@ -182,41 +182,7 @@ void discord_free_event(struct discord_event* event){
 
 
 
-static char* discord_send(struct discord_bot* bot, const char* request){
-    char* response = https_send(&bot->rest_api, request);
-    return response;
-}
-
-
-
-char* discord_send_message(struct discord_bot* bot, const char* channel_id, const char* content){
-    char request[8192];
-    snprintf(request, 8192,
-        "POST /api/v10/channels/%s/messages HTTP/1.1\r\n"
-        "Host: discord.com\r\n"
-        "Authorization: %s\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: %zu\r\n"
-        "\r\n"
-        "{\"content\":\"%s\"}",
-        channel_id,
-        DISCORD_TOKEN,
-        strlen(content) + 14,
-        content
-    );
-    return discord_send(bot, request);
-}
-
-
-
-char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const char* title, const char* description, const int color_hex){
-    char content[6144];
-    size_t content_length = snprintf(content, 6144,
-        "{\"embeds\":[{\"title\":\"%s\",\"description\":\"%s\",\"color\":%d}]}",
-        title,
-        description,
-        color_hex
-    );
+char* discord_send_raw(struct discord_bot* bot, const char* channel_id, const char* raw_json){
     char request[8192];
     snprintf(request, 8192,
         "POST /api/v10/channels/%s/messages HTTP/1.1\r\n"
@@ -227,10 +193,31 @@ char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const 
         "\r\n%s",
         channel_id,
         DISCORD_TOKEN,
-        content_length,
-        content
+        strlen(raw_json),
+        raw_json
     );
-    return discord_send(bot, request);
+    return https_send(&bot->rest_api, request);
+}
+
+
+
+char* discord_send_message(struct discord_bot* bot, const char* channel_id, const char* content){
+    char request[6144];
+    snprintf(request, 6144,"{\"content\":\"%s\"}", content);
+    return discord_send_raw(bot, channel_id, request);
+}
+
+
+
+char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const char* title, const char* description, const int color_hex){
+    char request[6144];
+    snprintf(request, 6144,
+        "{\"embeds\":[{\"title\":\"%s\",\"description\":\"%s\",\"color\":%d}]}",
+        title,
+        description,
+        color_hex
+    );
+    return discord_send_raw(bot, channel_id, request);
 }
 
 

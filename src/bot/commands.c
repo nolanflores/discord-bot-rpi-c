@@ -1,5 +1,6 @@
 #include "bot/commands.h"
 #include "bot/helldivers.h"
+#include "bot/help.h"
 
 enum command_hashes{
     CMD_SELL = 2090720021, CMD_BUDDY = 254689437, CMD_SOLD = 2090730903,
@@ -13,20 +14,23 @@ enum command_hashes{
     CMD_DIVE = 2090185645//dive is not implemented yet
 };
 
-static int djb2_hash(const char* command){
+static int djb2_hash(const char* command, const char** args){
     int hash = 5381;
     int c;
     while((c = *command++)){
-        if(c == ' ')
+        if(c == ' '){
+            *args = command;
             break;
+        }
         hash = ((hash << 5) + hash) + c;
     }
     return hash;
 }
 
 int handle_command(struct discord_bot* bot, const char* channel_id, const char* content){
+    const char* args = NULL;
     content++;//skip '!' prefix
-    int hash = djb2_hash(content);
+    int hash = djb2_hash(content, &args);
 
     char* response = NULL;
     switch(hash){
@@ -75,7 +79,12 @@ int handle_command(struct discord_bot* bot, const char* channel_id, const char* 
             response = discord_send_message(bot, channel_id, "https://github.com/nolanflores/discord-bot-rpi-c");
             break;
         case CMD_HELP:
-            response = discord_send_embed(bot, channel_id, "Available Commands", "!sell\\n!buddy\\n!sold\\n!bust\\n!slap\\n!react\\n!pray\\n!whip\\n!tap\\n!nuke\\n!notice\\n!winner\\n!mo\\n!war\\n!version\\n!repo", 0x192930);
+            if(args == NULL)
+                response = help_command(bot, channel_id);
+            else if(strcmp(args, "hd2") == 0)
+                response = help_helldivers(bot, channel_id);
+            else if(strcmp(args, "info") == 0)
+                response = help_info(bot, channel_id);
             break;
         //Commands with https requests
         case CMD_MO:
