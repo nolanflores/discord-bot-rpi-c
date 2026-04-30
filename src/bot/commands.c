@@ -7,7 +7,6 @@ enum command_hashes{
     CMD_BUST = 2090126755, CMD_SLAP = 2090727285, CMD_REACT = 273085876,
     CMD_PRAY = 2090626017, CMD_WHIP = 2090866941, CMD_TAP = 193506634,
     CMD_NUKE = 2090557720, CMD_NOTICE = 277905831,CMD_WINNER = 622798744,
-    CMD_TOSS = 2090767086,
 
     CMD_VERSION = 1929407563, CMD_REPO = 2090684219, CMD_HELP = 2090324718,
 
@@ -71,9 +70,6 @@ int handle_command(struct discord_bot* bot, const char* channel_id, const char* 
             break;
         case CMD_WINNER:
             response = discord_send_message(bot, channel_id, "https://tenor.com/view/epic-win-gif-18390652");
-            break;
-        case CMD_TOSS:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/game-of-thrones-little-finger-petyr-baelish-baelish-drop-gif-4018898");
             break;
         //Plain text
         case CMD_VERSION:
