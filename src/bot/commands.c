@@ -77,7 +77,7 @@ int handle_command(struct discord_bot* bot, const char* channel_id, const char* 
             break;
         //Plain text
         case CMD_VERSION:
-            response = discord_send_message(bot, channel_id, "Cumbot GNU C11 Edition");
+            response = discord_send_message(bot, channel_id, "Discord Bot GNU C11 Edition");
             break;
         case CMD_REPO:
             response = discord_send_message(bot, channel_id, "https://github.com/nolanflores/discord-bot-rpi-c");

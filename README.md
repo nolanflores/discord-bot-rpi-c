@@ -5,7 +5,7 @@ This bot connects to the Discord Gateway API and Discord REST API to read and re
 It was created to be run continuosly a Raspberry, but it can be run on other Unix systems.
 
 ## Disclaimer
-I, the author nolanflores, use this bot for personal use. As such, I have named my bot "Cumbot" and implemented commands pertinent to me. You will likely want to parse through and edit the code to change your bot's name and functionality. Perhaps some day I will add a pre-processor variable for the name.
+I, the author nolanflores, use this bot for personal use. It is a pet project of mine, therefore I have implemented commands useful to me. You will likely want to parse through and tweak the code for yourself, such as changing the gifs the bot can send. Someday I would like to make it easier to change command names and actions.
 
 This also requires that you setup a bot account on the Discord dev website to obtain a Bot token. Extra authorization is also required if your bot becomes a member of more than 100 servers. It is your duty to make sure you are following Discord's terms of service.
 

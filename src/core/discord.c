@@ -91,8 +91,8 @@ int discord_init(struct discord_bot* bot){
                 "\"intents\":%d,"
                 "\"properties\":{"
                     "\"os\":\"linux\","
-                    "\"browser\":\"cumbot\","
-                    "\"device\":\"cumbot\""
+                    "\"browser\":\"rpi_bot\","
+                    "\"device\":\"rpi_bot\""
                 "}"
             "}"
         "}",
