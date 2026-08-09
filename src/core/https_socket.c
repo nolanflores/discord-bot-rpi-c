@@ -14,13 +14,14 @@
 static SSL_CTX* ssl_ctx = NULL;
 
 /*
- * Static helper function for performing an IPv4 DNS lookup for the given hostname and port.
+ * Static helper function for https_tcp_connect()
+ * Performs a DNS lookup for the given hostname and port.
  * 
  * Returns a pointer to a linked list of addrinfo structures on success,
  * or NULL on failure.
  * The returned addrinfo list must be freed with freeaddrinfo when no longer needed.
  */
-static struct addrinfo* https_dns_lookup(const char* hostname, const char* port){
+static inline struct addrinfo* https_dns_lookup(const char* hostname, const char* port){
     struct addrinfo* addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_INET;
@@ -39,16 +40,16 @@ static struct addrinfo* https_dns_lookup(const char* hostname, const char* port)
  * Then connects the socket and frees the addrinfo list.
  * Closes the socket, frees the hostname and port on fail.
  * 
- * Returns 0 on success, 1 on failure.
+ * Returns 0 on success, -1 on failure.
  */
-static int https_tcp_connect(struct https_socket* sock, const char* hostname, const char* port){
+static int https_tcp_connect(https_socket* sock, const char* hostname, const char* port){
     struct addrinfo* addr_list = https_dns_lookup(hostname, port);
     if(addr_list == NULL)
-        return 1;
+        return -1;
     sock->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(sock->socket_fd == -1){
         fputs("Failed to create socket\n", stderr);
-        return 1;
+        return -1;
     }
     sock->hostname = strdup(addr_list->ai_canonname);
     sock->port = strdup(port);
@@ -63,21 +64,21 @@ static int https_tcp_connect(struct https_socket* sock, const char* hostname, co
     close(sock->socket_fd);
     free(sock->hostname);
     free(sock->port);
-    return 1;
+    return -1;
 }
 
 /*
  * Static helper function for establishing a TLS connection over an existing TCP socket.
  * Closes the TCP socket on failure.
  * 
- * Returns 0 on success, 1 on failure.
+ * Returns 0 on success, -1 on failure.
  */
-static int https_tls_connect(struct https_socket* sock){
+static int https_tls_connect(https_socket* sock){
     sock->ssl = SSL_new(ssl_ctx);
     if(!sock->ssl){
         fputs("Failed to create SSL structure\n", stderr);
         close(sock->socket_fd);
-        return 1;
+        return -1;
     }
     SSL_set_fd(sock->ssl, sock->socket_fd);
     if(sock->hostname)
@@ -88,7 +89,7 @@ static int https_tls_connect(struct https_socket* sock){
         fputs("SSL connection failed\n", stderr);
         SSL_free(sock->ssl);
         close(sock->socket_fd);
-        return 1;
+        return -1;
     }
     SSL_SESSION_free(sock->session);
     sock->session = SSL_get1_session(sock->ssl);
@@ -96,7 +97,7 @@ static int https_tls_connect(struct https_socket* sock){
 }
 
 
-static int https_reconnect(struct https_socket* sock){
+static int https_reconnect(https_socket* sock){
     SSL_shutdown(sock->ssl);
     SSL_free(sock->ssl);
     close(sock->socket_fd);
@@ -104,11 +105,11 @@ static int https_reconnect(struct https_socket* sock){
     char* old_port = sock->port;
     if(https_tcp_connect(sock, old_hostname, old_port)){
         fputs("Failed to reconnect TCP socket\n", stderr);
-        return 1;
+        return -1;
     }
     if(https_tls_connect(sock)){
         fputs("Failed to reconnect TLS socket\n", stderr);
-        return 1;
+        return -1;
     }
     free(old_hostname);
     free(old_port);
@@ -125,7 +126,7 @@ int https_ctx_init(){
     ssl_ctx = SSL_CTX_new(TLS_client_method());
     if(!ssl_ctx){
         fputs("Failed to initialize SSL context\n", stderr);
-        return 1;
+        return -1;
     }
     SSL_CTX_set_session_cache_mode(ssl_ctx, SSL_SESS_CACHE_CLIENT);
     return 0;
@@ -133,11 +134,11 @@ int https_ctx_init(){
 
 
 
-int https_connect(struct https_socket* sock, const char* hostname, const char* port){
+int https_connect(https_socket* sock, const char* hostname, const char* port){
     if(https_tcp_connect(sock, hostname, port))
-        return 1;
+        return -1;
     if(https_tls_connect(sock))
-        return 1;
+        return -1;
     return 0;
 }
 

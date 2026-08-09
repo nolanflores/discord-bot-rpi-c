@@ -9,62 +9,42 @@
  * This structure is a wrapper for the underlying https_socket,
  * and exists to prevent passing an upgraded socket to https functions.
  */
-struct websocket{
-    struct https_socket https_sock;
-};
+typedef struct websocket{
+    https_socket https_sock;
+} websocket;
 
 /*
-* Represents a received WebSocket message.
-* 
-* opcode: The WebSocket opcode (e.g., 1 for text, 2 for binary).
-* payload: The message payload as a null-terminated string.
-* payload_len: The length of the payload in bytes.
-*/
-struct ws_message{
-    int opcode;
-    char* payload;
-    size_t payload_len;
-};
-
-/*
- * Establishes a TCP/TLS socket connection.
+ * Estableshes a TCP/TLS socket connection.
  * Then performs the WebSocket upgrade handshake.
  * Closes the TCP socket on failure.
  * 
  * This function performs the DNS lookup internally.
  * 
- * Returns 0 on success, 1 on failure.
+ * Returns 0 on success, -1 on failure.
  */
-int ws_connect(struct websocket* ws, const char* hostname, const char* port);
+int ws_connect(websocket* ws, const char* hostname, const char* port);
 
 /*
- * Sends a text websocket frame (opcode 1) with the given message.
- * Accepts messages up to 4096 bytes in length, including the null terminator.
- * This is a self imposed limit, as the WebSocket protocol supports much larger messages.
- * However, the discord gateway has a single frame limit of 4096 bytes.
+ * Sends a text websocket frame (opcode 1) with a passed payload.
+ * Accepts payloads up to 4096 bytes in length, including the null terminator.
  *
- * Returns 0 on success, 1 on failure.
+ * Returns 0 on success, -1 on failure.
  */
-int ws_send_text(struct websocket* ws, const char* message);
+int ws_send(websocket* ws, const char* message);
 
 /*
- * Receives a websocket frame and returns the payload as a null-terminated string.
- * The caller is responsible for freeing the returned string.
+ * Receives the opcode and payload of a WebSocket frame.
  * 
- * Returns NULL if a close frame is received, or if reading fails.
+ * Returns the opcode if a valid frame is received, or -1 if reading fails.
+ * The payload is written to the provided buffer, up to buffer_size bytes.
+ * If the payload is larger than buffer_size, it will be treated as a failure.
  */
-struct ws_message* ws_receive(struct websocket* ws);
+int ws_receive(websocket* ws, char* buffer, size_t buffer_size);
 
 /*
  * Sends a WebSocket close frame (opcode 8) to the server.
  * Closes the TLS connection and TCP socket.
  */
-void ws_close(struct websocket* ws);
-
-/*
- * Frees a ws_message structure.
- * Also frees the member payload.
- */
-void ws_free_message(struct ws_message* msg);
+void ws_close(websocket* ws);
 
 #endif

@@ -2,13 +2,13 @@
 #include <openssl/rand.h>
 
 /*
- * Static helper function for connecting a websocket.
+ * Static helper function for ws_connect().
  * Performs the WebSocket handshake over the established TLS connection.
  * Closes the TLS connection and TCP socket on failure.
  * 
- * Returns 0 on success, 1 on failure.
+ * Returns 0 on success, -1 on failure.
  */
-static int ws_handshake(struct websocket* ws){
+static inline int ws_handshake(websocket* ws){
     unsigned char rand_key[16];
     RAND_bytes(rand_key, 16);
     char base64_key[64];
@@ -26,18 +26,18 @@ static int ws_handshake(struct websocket* ws){
     );
     if(0 >= SSL_write(ws->https_sock.ssl, request, strlen(request))){
         fputs("Failed to send websocket upgrade request\n", stderr);
-        return 1;
+        return -1;
     }
     char response[8192];
     int bytes_read = SSL_read(ws->https_sock.ssl, response, 8191);
     if(bytes_read <= 0){
         fputs("Failed to read websocket upgrade response\n", stderr);
-        return 1;
+        return -1;
     }
     response[bytes_read] = '\0';
     if(strncmp(response, "HTTP/1.1 101", 12) != 0){
         fputs("WebSocket upgrade failed\n", stderr);
-        return 1;
+        return -1;
     }
     return 0;
 }
@@ -48,25 +48,25 @@ static int ws_handshake(struct websocket* ws){
 */ 
 
 
-int ws_connect(struct websocket* ws, const char* hostname, const char* port){
+int ws_connect(websocket* ws, const char* hostname, const char* port){
     if(https_connect(&ws->https_sock, hostname, port)){
         fputs("Websocket TCP connection failed\n", stderr);
-        return 1;
+        return -1;
     }
     if(ws_handshake(ws)){
         https_close(&ws->https_sock);
-        return 1;
+        return -1;
     }
     return 0;
 }
 
 
 
-int ws_send_text(struct websocket* ws, const char* message){
+int ws_send(websocket* ws, const char* message){
     size_t payload_len = strlen(message);
     if(payload_len >= 4096){
         fputs("Payload too large\n", stderr);
-        return 1;
+        return -1;
     }
     size_t offset = 0;
     if(payload_len >= 126)
@@ -75,7 +75,7 @@ int ws_send_text(struct websocket* ws, const char* message){
     unsigned char* frame = (unsigned char*)malloc(frame_size);
     if(!frame){
         fputs("Failed to allocate memory for frame\n", stderr);
-        return 1;
+        return -1;
     }
     frame[0] = 0x81;
     if(payload_len < 126){
@@ -93,106 +93,57 @@ int ws_send_text(struct websocket* ws, const char* message){
     free(frame);
     if(write_result <= 0){
         fputs("Failed to send WebSocket frame\n", stderr);
-        return 1;
+        return -1;
     }
     return 0;
 }
 
 
 
-struct ws_message* ws_receive(struct websocket* ws){
-    struct ws_message* msg = (struct ws_message*)malloc(sizeof(struct ws_message));
-    if(!msg){
-        fputs("Failed to allocate memory for ws_message\n", stderr);
-        return NULL;
-    }
-    msg->opcode = 0;
-    char* payloads[100] = {0};
-    size_t payload_lengths[100];
-    int payload_count = 0;
+int ws_receive(websocket* ws, char* buffer, size_t buffer_size){
+    int opcode = 0;
+    size_t payload_len = 0;
     unsigned char header[2];
     do{
         SSL_read(ws->https_sock.ssl, header, 2);
-        if(!msg->opcode){
-            msg->opcode = header[0] & 0x0F;
-            if(msg->opcode == 8){
+        if(opcode == 0){
+            opcode = header[0] & 0x0F;
+            if(opcode == 8){
                 fputs("Received close frame\n", stderr);
-                msg->payload = NULL;
-                msg->payload_len = 0;
-                return msg;
+                return -1;
             }
         }
-        payload_lengths[payload_count] = header[1] & 0x7F;
-        if(payload_lengths[payload_count] == 126){
+        int frame_len = header[1] & 0x7F;
+        if(frame_len == 126){
             unsigned char ext[2];
             SSL_read(ws->https_sock.ssl, ext, 2);
-            payload_lengths[payload_count] = ((size_t)ext[0] << 8) | (size_t)ext[1];
+            frame_len = ((size_t)ext[0] << 8) | (size_t)ext[1];
         }
-        payloads[payload_count] = (char*)malloc(payload_lengths[payload_count]+1);
+        if(payload_len + frame_len >= buffer_size){
+            fputs("Payload too large for buffer\n", stderr);
+            return -1;
+        }
         int bytes_read = 0;
-        while(bytes_read < (int)payload_lengths[payload_count]){
-            int b_r = SSL_read(ws->https_sock.ssl, payloads[payload_count] + bytes_read, payload_lengths[payload_count] - bytes_read);
+        while(bytes_read < frame_len){
+            int b_r = SSL_read(ws->https_sock.ssl, buffer + payload_len + bytes_read, frame_len - bytes_read);
             if(b_r <= 0){
                 fputs("Failed to read WebSocket payload\n", stderr);
-                ws_free_message(msg);
-                for(int i = 0; i < payload_count; i++)
-                    free(payloads[i]);
-                return NULL;
+                return -1;
             }
             bytes_read += b_r;
         }
-        payload_count++;
-        if(payload_count >= 100){
-            fputs("Too many fragmented frames\n", stderr);
-            ws_free_message(msg);
-            for(int i = 0; i < payload_count; i++)
-                free(payloads[i]);
-            return NULL;
-        }
+        payload_len += frame_len;
     }while(!(header[0] & 0x80));
-    if(payload_count == 1){
-        msg->payload = payloads[0];
-        msg->payload[payload_lengths[0]] = '\0';
-        msg->payload_len = payload_lengths[0];
-    }else{
-        size_t total_len = 0;
-        for(int i = 0; i < payload_count; i++){
-            total_len += payload_lengths[i];
-        }
-        msg->payload = (char*)malloc(total_len + 1);
-        if(!msg->payload){
-            fputs("Failed to allocate memory for combined payload\n", stderr);
-            for(int i = 0; i < payload_count; i++)
-                free(payloads[i]);
-            ws_free_message(msg);
-            return NULL;
-        }
-        size_t offset = 0;
-        for(int i = 0; i < payload_count; i++){
-            memcpy(msg->payload + offset, payloads[i], payload_lengths[i]);
-            offset += payload_lengths[i];
-            free(payloads[i]);
-        }
-        msg->payload[total_len] = '\0';
-        msg->payload_len = total_len;
-    }
-    return msg;
+    buffer[payload_len] = '\0';
+    return payload_len;
 }
 
 
 
-void ws_free_message(struct ws_message* msg){
-    if(msg)
-        free(msg->payload);
-    free(msg);
-}
-
-
-
-void ws_close(struct websocket* ws){
+void ws_close(websocket* ws){
     if(ws->https_sock.ssl){
         unsigned char close_frame[6] = {0x88, 0x80};
-        RAND_bytes(&close_frame[2], 4);
+        RAND_bytes(close_frame + 2, 4);
         SSL_write(ws->https_sock.ssl, close_frame, 6);
     }
     https_close(&ws->https_sock);
