@@ -1,4 +1,4 @@
-#include "core/discord.h"
+#include "discord/discord.h"
 #include "discord_token.h"
 #include <time.h>
 #include <netdb.h>
@@ -54,10 +54,10 @@ static void* heartbeat_loop(void* arg){
 
 int discord_init(struct discord_bot* bot){
     if(https_connect(&bot->rest_api, "discord.com", "443"))
-        return 1;
+        return -1;
     if(ws_connect(&bot->ws, "gateway.discord.gg", "443")){
         https_close(&bot->rest_api);
-        return 1;
+        return -1;
     }
     
     struct ws_message* msg = ws_receive(&bot->ws);

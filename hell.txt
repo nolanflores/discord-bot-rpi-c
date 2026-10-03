@@ -1,0 +1,16 @@
+api.live.prod.thehelldiversgame.com/api
+
+/WarSeason/current/WarID
+
+/WarSeason/${warId}/Status
+/WarSeason/${warId}/WarInfo
+
+/WarSeason/${warId}/WarTime
+
+/v2/Assignment/War/${warId}
+
+/NewsFeed/${warId}?maxEntries=102
+
+
+/Stats/War/${warId}/Summary
+

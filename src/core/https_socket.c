@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200112L
 
 #include "core/https_socket.h"
+#include "core/SSL_context.h"
 
 #include <netdb.h>
 #include <stdio.h>
@@ -10,8 +11,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-// Global SSL context used for all https_socket connections.
-static SSL_CTX* ssl_ctx = NULL;
+
+/* ==============================================================================================
+ * Socket Connection
+ * ==============================================================================================
+*/
 
 /*
  * Static helper function for https_tcp_connect()
@@ -96,7 +100,6 @@ static int https_tls_connect(https_socket* sock){
     return 0;
 }
 
-
 static int https_reconnect(https_socket* sock){
     SSL_shutdown(sock->ssl);
     SSL_free(sock->ssl);
@@ -116,24 +119,6 @@ static int https_reconnect(https_socket* sock){
     return 0;
 }
 
-
-int https_ctx_init(){
-    if(ssl_ctx)
-        return 0;
-    SSL_library_init();
-    SSL_load_error_strings();
-    OpenSSL_add_all_algorithms();
-    ssl_ctx = SSL_CTX_new(TLS_client_method());
-    if(!ssl_ctx){
-        fputs("Failed to initialize SSL context\n", stderr);
-        return -1;
-    }
-    SSL_CTX_set_session_cache_mode(ssl_ctx, SSL_SESS_CACHE_CLIENT);
-    return 0;
-}
-
-
-
 int https_connect(https_socket* sock, const char* hostname, const char* port){
     if(https_tcp_connect(sock, hostname, port))
         return -1;
@@ -142,7 +127,28 @@ int https_connect(https_socket* sock, const char* hostname, const char* port){
     return 0;
 }
 
+void https_close(struct https_socket* sock){
+    if(sock->ssl){
+        SSL_shutdown(sock->ssl);
+        SSL_free(sock->ssl);
+    }
+    if(sock->socket_fd != -1){
+        close(sock->socket_fd);
+    }
+    if(sock->session){
+        SSL_SESSION_free(sock->session);
+        sock->session = NULL;
+    }
+    free(sock->hostname);
+    free(sock->port);
+    sock->hostname = NULL;
+    sock->port = NULL;
+}
 
+/* ==============================================================================================
+ * Data Transmission
+ * ==============================================================================================
+*/
 
 /*
  * Read HTTP headers from the SSL connection into the passed buffer.
@@ -329,33 +335,4 @@ char* https_send(struct https_socket* sock, const char* data){
     
     fputs("Response has neither Content-Length nor chunked encoding\n", stderr);
     return NULL;
-}
-
-
-
-void https_close(struct https_socket* sock){
-    if(sock->ssl){
-        SSL_shutdown(sock->ssl);
-        SSL_free(sock->ssl);
-    }
-    if(sock->socket_fd != -1){
-        close(sock->socket_fd);
-    }
-    if(sock->session){
-        SSL_SESSION_free(sock->session);
-        sock->session = NULL;
-    }
-    free(sock->hostname);
-    free(sock->port);
-    sock->hostname = NULL;
-    sock->port = NULL;
-}
-
-
-
-void https_ctx_free(){
-    if(ssl_ctx){
-        SSL_CTX_free(ssl_ctx);
-        ssl_ctx = NULL;
-    }
 }

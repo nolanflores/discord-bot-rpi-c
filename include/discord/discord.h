@@ -3,7 +3,7 @@
 
 #include "core/https_socket.h"
 #include "core/websocket.h"
-#include "core/cJSON.h"
+#include "core/yyjson.h"
 #include <pthread.h>
 
 /*

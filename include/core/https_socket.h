@@ -21,15 +21,6 @@ typedef struct https_socket{
 } https_socket;
 
 /*
- * Initializes the global SSL context.
- * This function must be called before any other https functions.
- * https_ctx_free should be called when the context is no longer needed.
- * 
- * Returns 0 on success, -1 on failure.
- */
-int https_ctx_init();
-
-/*
  * Establishes a TCP/TLS socket connection.
  * Closes the TCP socket on failure.
  * Allocates and sets the hostname and port fields of the https_socket.
@@ -51,11 +42,5 @@ char* https_send(https_socket* sock, const char* request);
  * Frees the hostname string.
  */
 void https_close(https_socket* sock);
-
-/*
- * Frees the global SSL context.
- * This function should be called when the SSL context is no longer needed.
- */
-void https_ctx_free();
 
 #endif

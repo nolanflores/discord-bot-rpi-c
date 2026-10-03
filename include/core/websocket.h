@@ -35,7 +35,7 @@ int ws_send(websocket* ws, const char* message);
 /*
  * Receives the opcode and payload of a WebSocket frame.
  * 
- * Returns the opcode if a valid frame is received, or -1 if reading fails.
+ * Returns the length of the payload, or -1 if reading fails.
  * The payload is written to the provided buffer, up to buffer_size bytes.
  * If the payload is larger than buffer_size, it will be treated as a failure.
  */
