@@ -1,5 +1,5 @@
 #include "core/discord.h"
-#include "discord_token.h"
+#include "core/token.h"
 #include <time.h>
 #include <netdb.h>
 
@@ -96,7 +96,7 @@ int discord_init(struct discord_bot* bot){
                 "}"
             "}"
         "}",
-        DISCORD_TOKEN,
+        get_token(),
         (1 << 9) | (1 << 12) | (1 << 15)//GUILD_MESSAGES, DIRECT_MESSAGES, MESSAGE_CONTENT
     );
     pthread_mutex_lock(&bot->mutex);
@@ -192,7 +192,7 @@ char* discord_send_raw(struct discord_bot* bot, const char* channel_id, const ch
         "Content-Length: %zu\r\n"
         "\r\n%s",
         channel_id,
-        DISCORD_TOKEN,
+        get_token(),
         strlen(raw_json),
         raw_json
     );

@@ -1,4 +1,4 @@
 .vscode/
 build/
+test/
 run
-discord_token.h

@@ -1,9 +1,10 @@
 #include "core/discord.h"
 #include "bot/commands.h"
+#include "core/token.h"
 #include <locale.h>
 
-
 int main(){
+    load_token();
     setlocale(LC_NUMERIC, "");
     https_ctx_init();
 
