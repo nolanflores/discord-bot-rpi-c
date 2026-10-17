@@ -51,23 +51,42 @@ Open the file "discord_token.h" in the project root and paste your bot token whe
 > DO NOT PUSH YOUR BOT TOKEN TO YOUR REPOSITORY.
 > It can result in outsiders having access to your bot.
 
-## Running the bot
+## How To Deploy
 
-I have provided a script for compilation
+This bot can either be run straight as an executable binary or as a Docker image
 
+### Binary
+
+Compile the binary with the makefile, the resulting binary "run" is the Discord bot. You can run that executable directly, or you can use something like systemd to restart the process on failure.
+
+### Docker
+
+- Install Docker ([instructions can be found here](https://docs.docker.com/desktop/setup/install/linux/))
+- Build the docker image
 ```
-./compile.sh
+make release
 ```
-
-This will create an executable file that can be run
-
+- Place your Discord Bot token in a text file, remember the path to this file
+- In your desired directory, create docker compose.yaml file with the following content
 ```
-./run
+services:
+    mybot:
+        image: discord_bot
+        container_name: discord_bot
+        restart: unless-stopped
+        init: true
+        secrets:
+        - discord_token
+    
+    secrets:
+    discord_token:
+        file: <PATH TO THE TOKEN FILE>
 ```
-
-## Deployment
-
-I run this program with systemd in order to restart the program should it fail. It is not necessary, but I would recomend looking into it.
+- Insert your token into the bottom line of the compose.yaml
+- Start the docker container
+```
+docker compose up -d
+```
 
 ## Built With
 
