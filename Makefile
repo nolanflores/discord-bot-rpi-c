@@ -2,6 +2,9 @@ CC     := gcc
 TARGET := run
 MODE   ?= default
 
+IMAGE  := discord_bot
+DOCKER := docker
+
 SRCS := src/main.c $(wildcard src/core/*.c) $(wildcard src/bot/*.c)
 
 BUILD := build/$(MODE)
@@ -38,7 +41,7 @@ pi:
 	$(MAKE) MODE=pi all
 
 release:
-	$(MAKE) MODE=release all
+	$(DOCKER) build -t $(IMAGE) .
 
 $(BIN): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDLIBS)

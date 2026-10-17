@@ -6,7 +6,7 @@ WORKDIR /src
 COPY Makefile ./
 COPY include/ include/
 COPY src/ src/
-RUN make release
+RUN make MODE=release all
 
 FROM debian:bookworm-slim
 RUN apt-get update \
