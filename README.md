@@ -44,9 +44,9 @@ Install libssl-dev
 sudo apt install libssl-dev
 ```
 
-#### Insert your Bot token
+#### Get a Bot token
 
-Open the file "discord_token.h" in the project root and paste your bot token where it says "YOUR_BOT_TOKEN_HERE"
+The [Discord Developer Portal](https://discord.com/developers/applications) can give you a Bot token after creating a new application. Extra information on how to create and deal with Discord bots can be found on their [Developer Docs](https://docs.discord.com/developers/platform/bots) Once you have this token, it is very important that you paste it and save it into a secret file to be used at runtime.
 > [!WARNING]
 > DO NOT PUSH YOUR BOT TOKEN TO YOUR REPOSITORY.
 > It can result in outsiders having access to your bot.
