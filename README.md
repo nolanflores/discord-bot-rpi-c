@@ -2,7 +2,7 @@
 
 A Discord bot using Unix sockets to implement the WebSocket protocol and make HTTPS connections.
 This bot connects to the Discord Gateway API and Discord REST API to read and respond to commands.
-It was created to be run continuosly a Raspberry, but it can be run on other Unix systems.
+It was created to be run continuosly a Raspberry, but it can be run on other Linux systems.
 
 ## Disclaimer
 I, the author nolanflores, use this bot for personal use. It is a pet project of mine, therefore I have implemented commands useful to me. You will likely want to parse through and tweak the code for yourself, such as changing the gifs the bot can send. Someday I would like to make it easier to change command names and actions.
