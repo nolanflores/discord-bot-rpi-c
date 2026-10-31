@@ -1,7 +1,7 @@
 #ifndef HELLDIVERS_H
 #define HELLDIVERS_H
 
-#include "core/discord.h"
+#include "discord/discord.h"
 
 //list of all the planets
 extern const char* planet_names[267];

@@ -5,7 +5,7 @@ MODE   ?= default
 IMAGE  := discord_bot
 DOCKER := docker
 
-SRCS := src/main.c $(wildcard src/core/*.c) $(wildcard src/bot/*.c)
+SRCS := src/main.c $(wildcard src/core/*.c) $(wildcard src/bot/*.c) $(wildcard src/discord/*.c)
 
 BUILD := build/$(MODE)
 BIN   := $(BUILD)/$(TARGET)

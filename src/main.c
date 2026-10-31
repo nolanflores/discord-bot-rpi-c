@@ -1,6 +1,6 @@
-#include "core/discord.h"
+#include "discord/discord.h"
+#include "discord/token.h"
 #include "bot/commands.h"
-#include "core/token.h"
 #include <locale.h>
 
 int main(){

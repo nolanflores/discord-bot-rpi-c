@@ -1,7 +1,7 @@
 #ifndef HELP_H
 #define HELP_H
 
-#include "core/discord.h"
+#include "discord/discord.h"
 
 char* help_command(struct discord_bot* bot, const char* channel_id);
 

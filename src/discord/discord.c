@@ -1,5 +1,5 @@
-#include "core/discord.h"
-#include "core/token.h"
+#include "discord/discord.h"
+#include "discord/token.h"
 #include <time.h>
 #include <netdb.h>
 
