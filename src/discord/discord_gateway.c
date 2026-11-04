@@ -1,5 +1,5 @@
-#include "core/discord.h"
-#include "core/token.h"
+#include "discord/discord_gateway.h"
+#include "discord/token.h"
 #include <time.h>
 #include <netdb.h>
 
@@ -9,13 +9,13 @@
  * The loop can be exited by setting the heartbeat_interval to 0 and signaling the condition variable.
  */
 static void* heartbeat_loop(void* arg){
-    struct discord_bot* bot = (struct discord_bot*)arg;
+    discord_gateway* gw = (discord_gateway*)arg;
 
     char heartbeat_payload[64];
 
     struct timespec ts;
-    int interval_sec = bot->heartbeat_interval / 1000;
-    int interval_nsec = (bot->heartbeat_interval % 1000) * 1000000;
+    int interval_sec = gw->heartbeat_interval / 1000;
+    int interval_nsec = (gw->heartbeat_interval % 1000) * 1000000;
 
     while(1){
         clock_gettime(0, &ts);
@@ -26,20 +26,20 @@ static void* heartbeat_loop(void* arg){
             ts.tv_nsec -= 1000000000;
         }
 
-        pthread_mutex_lock(&bot->mutex);
-        pthread_cond_timedwait(&bot->cond, &bot->mutex, &ts);
+        pthread_mutex_lock(&gw->mutex);
+        pthread_cond_timedwait(&gw->cond, &gw->mutex, &ts);
 
-        if(bot->heartbeat_interval == 0){
-            pthread_mutex_unlock(&bot->mutex);
+        if(gw->heartbeat_interval == 0){
+            pthread_mutex_unlock(&gw->mutex);
             break;
         }
-        if(bot->event_s == -1){
+        if(gw->event_s == -1){
             snprintf(heartbeat_payload, 64,"{\"op\":1,\"d\":null}");
         }else{
-            snprintf(heartbeat_payload, 64,"{\"op\":1,\"d\":%d}", bot->event_s);
+            snprintf(heartbeat_payload, 64,"{\"op\":1,\"d\":%d}", gw->event_s);
         }
-        ws_send_text(&bot->ws, heartbeat_payload);
-        pthread_mutex_unlock(&bot->mutex);
+        ws_send_text(&gw->ws, heartbeat_payload);
+        pthread_mutex_unlock(&gw->mutex);
     }
 
     return NULL;
@@ -52,33 +52,29 @@ static void* heartbeat_loop(void* arg){
 */
 
 
-int discord_init(struct discord_bot* bot){
-    if(https_connect(&bot->rest_api, "discord.com", "443"))
-        return 1;
-    if(ws_connect(&bot->ws, "gateway.discord.gg", "443")){
-        https_close(&bot->rest_api);
+int gateway_init(discord_gateway* gw){
+    if(ws_connect(&gw->ws, "gateway.discord.gg", "443")){
+        ws_close(&gw->ws);
         return 1;
     }
     
-    struct ws_message* msg = ws_receive(&bot->ws);
+    struct ws_message* msg = ws_receive(&gw->ws);
     if(!msg){
-        https_close(&bot->rest_api);
-        ws_close(&bot->ws);
+        ws_close(&gw->ws);
         return 1;
     }
-    bot->event_s = -1;
+    gw->event_s = -1;
     cJSON* json = cJSON_Parse(msg->payload);
     cJSON* d = cJSON_GetObjectItem(json, "d");
-    bot->heartbeat_interval = cJSON_GetObjectItem(d, "heartbeat_interval")->valueint;
+    gw->heartbeat_interval = cJSON_GetObjectItem(d, "heartbeat_interval")->valueint;
     cJSON_Delete(json);
     ws_free_message(msg);
     
-    if(pthread_mutex_init(&bot->mutex, NULL) || 
-        pthread_cond_init(&bot->cond, NULL) ||
-        pthread_create(&bot->heartbeat_thread, NULL, heartbeat_loop, bot)
+    if(pthread_mutex_init(&gw->mutex, NULL) || 
+        pthread_cond_init(&gw->cond, NULL) ||
+        pthread_create(&gw->heartbeat_thread, NULL, heartbeat_loop, gw)
     ){
-        https_close(&bot->rest_api);
-        ws_close(&bot->ws);
+        ws_close(&gw->ws);
         return 1;
     }
 
@@ -99,23 +95,23 @@ int discord_init(struct discord_bot* bot){
         get_token(),
         (1 << 9) | (1 << 12) | (1 << 15)//GUILD_MESSAGES, DIRECT_MESSAGES, MESSAGE_CONTENT
     );
-    pthread_mutex_lock(&bot->mutex);
-    ws_send_text(&bot->ws, identify_payload);
-    pthread_mutex_unlock(&bot->mutex);
+    pthread_mutex_lock(&gw->mutex);
+    ws_send_text(&gw->ws, identify_payload);
+    pthread_mutex_unlock(&gw->mutex);
     return 0;
 }
 
 
 
-struct discord_event* discord_receive_event(struct discord_bot* bot){
-    struct ws_message* message = ws_receive(&bot->ws);
+gateway_event* gateway_receive_event(discord_gateway* gw){
+    struct ws_message* message = ws_receive(&gw->ws);
     if(!message)
         return NULL;
     if((message->opcode != 1 && message->opcode != 8) || (message->payload && strncmp(message->payload, "{\"op\":11", 8) == 0)){
         ws_free_message(message);
         return NULL;
     }
-    struct discord_event* event = (struct discord_event*)calloc(1, sizeof(struct discord_event));
+    gateway_event* event = (gateway_event*)calloc(1, sizeof(gateway_event));
     if(message->opcode == 8){
         ws_free_message(message);
         event->type = CLOSE_CONNECTION;
@@ -134,9 +130,9 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
         return event;
     }
     cJSON* s = cJSON_GetObjectItemCaseSensitive(json, "s");
-    pthread_mutex_lock(&bot->mutex);
-    bot->event_s = s->valueint;
-    pthread_mutex_unlock(&bot->mutex);
+    pthread_mutex_lock(&gw->mutex);
+    gw->event_s = s->valueint;
+    pthread_mutex_unlock(&gw->mutex);
     if(strcmp(t->valuestring, "MESSAGE_CREATE") == 0){
         event->type = MESSAGE_CREATE;
         cJSON* d = cJSON_GetObjectItemCaseSensitive(json, "d");
@@ -172,7 +168,7 @@ struct discord_event* discord_receive_event(struct discord_bot* bot){
 
 
 
-void discord_free_event(struct discord_event* event){
+void gateway_free_event(gateway_event* event){
     if(event){
         if(event->json)
             cJSON_Delete(event->json);
@@ -180,55 +176,12 @@ void discord_free_event(struct discord_event* event){
     }
 }
 
-
-
-char* discord_send_raw(struct discord_bot* bot, const char* channel_id, const char* raw_json){
-    char request[8192];
-    snprintf(request, 8192,
-        "POST /api/v10/channels/%s/messages HTTP/1.1\r\n"
-        "Host: discord.com\r\n"
-        "Authorization: %s\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: %zu\r\n"
-        "\r\n%s",
-        channel_id,
-        get_token(),
-        strlen(raw_json),
-        raw_json
-    );
-    return https_send(&bot->rest_api, request);
-}
-
-
-
-char* discord_send_message(struct discord_bot* bot, const char* channel_id, const char* content){
-    char request[6144];
-    snprintf(request, 6144,"{\"content\":\"%s\"}", content);
-    return discord_send_raw(bot, channel_id, request);
-}
-
-
-
-char* discord_send_embed(struct discord_bot* bot, const char* channel_id, const char* title, const char* description, const int color_hex){
-    char request[6144];
-    snprintf(request, 6144,
-        "{\"embeds\":[{\"title\":\"%s\",\"description\":\"%s\",\"color\":%d}]}",
-        title,
-        description,
-        color_hex
-    );
-    return discord_send_raw(bot, channel_id, request);
-}
-
-
-
-void discord_cleanup(struct discord_bot* bot){
-    pthread_mutex_lock(&bot->mutex);
-    bot->heartbeat_interval = 0;
-    pthread_cond_signal(&bot->cond);
-    pthread_mutex_unlock(&bot->mutex);
-    pthread_join(bot->heartbeat_thread, NULL);
-    pthread_mutex_destroy(&bot->mutex);
-    ws_close(&bot->ws);
-    https_close(&bot->rest_api);
+void gateway_cleanup(discord_gateway* gw){
+    pthread_mutex_lock(&gw->mutex);
+    gw->heartbeat_interval = 0;
+    pthread_cond_signal(&gw->cond);
+    pthread_mutex_unlock(&gw->mutex);
+    pthread_join(gw->heartbeat_thread, NULL);
+    pthread_mutex_destroy(&gw->mutex);
+    ws_close(&gw->ws);
 }

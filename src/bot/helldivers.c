@@ -1,5 +1,6 @@
 #include "bot/helldivers.h"
 #include "core/https_socket.h"
+#include "core/cJSON.h"
 
 static cJSON* helldivers_request(const char* path){
     struct https_socket sock;
@@ -60,7 +61,7 @@ static int helldivers_double_request(const char* path1, const char* path2, cJSON
     return 0;
 }
 
-char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
+char* helldivers_war_summary(discord_rest* rest, const char* channel_id){
     cJSON* status = NULL;
     cJSON* info = NULL;
     if(helldivers_double_request("/api/WarSeason/801/Status", "/api/WarSeason/801/WarInfo", &status, &info))
@@ -140,13 +141,13 @@ char* helldivers_war_summary(struct discord_bot* bot, const char* channel_id){
     }else{
         message_len += snprintf(message + message_len, 1024 - message_len, "### Democracy Space Station\\nDSS Not Currently Available");
     }
-    char* response = discord_send_embed(bot, channel_id, "Active Planets", message, 0xFFE900);
+    char* response = rest_send_embed(rest, channel_id, "Active Planets", message, 0xFFE900);
     cJSON_Delete(status);
     cJSON_Delete(info);
     return response;
 }
 
-char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
+char* helldivers_major_order(discord_rest* rest, const char* channel_id){
     cJSON* json = helldivers_request("/api/v2/Assignment/War/801");
     if(json == NULL)
         return NULL;
@@ -155,7 +156,7 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
     int size = cJSON_GetArraySize(json);
     if(size == 0){
         cJSON_Delete(json);
-        return discord_send_embed(bot, channel_id, "High Command Orders", "Awaiting Next Orders", 0x016AB5);
+        return rest_send_embed(rest, channel_id, "High Command Orders", "Awaiting Next Orders", 0x016AB5);
     }
     for(int i = 0; i < size; i++){
         cJSON* order = cJSON_GetArrayItem(json, i);
@@ -190,12 +191,12 @@ char* helldivers_major_order(struct discord_bot* bot, const char* channel_id){
         }
         message_len += snprintf(message + message_len, 2048 - message_len, "Expires in %d days and %d hours%s", days, hours, i < size - 1 ? "\\n\\n" : "");
     }
-    char* response = discord_send_embed(bot, channel_id, "High Command Orders", message, 0x016AB5);
+    char* response = rest_send_embed(rest, channel_id, "High Command Orders", message, 0x016AB5);
     cJSON_Delete(json);
     return response;
 }
 
-char* helldivers_cyberstan(struct discord_bot* bot, const char* channel_id){
+char* helldivers_cyberstan(discord_rest* rest, const char* channel_id){
     cJSON* json = helldivers_request("/api/WarSeason/801/Status");
     if(json == NULL)
         return NULL;
@@ -220,7 +221,7 @@ char* helldivers_cyberstan(struct discord_bot* bot, const char* channel_id){
     int maxValue = cJSON_GetObjectItemCaseSensitive(reserves, "maxValue")->valueint;
     int changePerHour = cJSON_GetObjectItemCaseSensitive(reserves, "changePerSecond")->valueint * 3600;
     snprintf(message + message_len, 1024 - message_len, "### %'d Forces in Reserve (%.2f%%)\\n-# %'d (%.2f%%) per hour", currentValue, (100.0 * currentValue) / maxValue, changePerHour, (100.0 * changePerHour) / maxValue);
-    char* response = discord_send_embed(bot, channel_id, "Battle For Cyberstan", message, 0xFE6A67);
+    char* response = rest_send_embed(rest, channel_id, "Battle For Cyberstan", message, 0xFE6A67);
     cJSON_Delete(json);
     return response;
 }

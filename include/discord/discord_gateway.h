@@ -7,9 +7,8 @@
 #include <pthread.h>
 
 /*
- * Structure representing an active Discord bot connection.
+ * Structure representing an active Discord gateway connection.
  * 
- * rest_api: The HTTPS socket connected to the Discord REST API.
  * ws: The websocket connected to the Discord Gateway.
  * heartbeat_thread: The thread responsible for sending heartbeat messages to the Gateway.
  * mutex: Mutex for synchronizing access to shared bot state.
@@ -17,15 +16,14 @@
  * heartbeat_interval: The interval in milliseconds between heartbeats, as specified by the Gateway.
  * event_s: The "s" field from the most recent Gateway event, used for heartbeats.
  */
-struct discord_bot{
-    struct https_socket rest_api;
-    struct websocket ws;
+typedef struct discord_gateway{
+    websocket ws;
     pthread_t heartbeat_thread;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     int heartbeat_interval;
     int event_s;
-};
+}discord_gateway;
 
 /*
  * Enum representing the type of received Discord events.
@@ -39,7 +37,7 @@ enum event_type{
     CLOSE_CONNECTION
 };
 
-struct discord_event{
+typedef struct gateway_event{
     cJSON* json;
     char* id;
     char* token;
@@ -47,20 +45,14 @@ struct discord_event{
     char* custom_id;
     char* content;
     enum event_type type;
-};
+}gateway_event;
 
-int discord_init(struct discord_bot* bot);
+int gateway_init(discord_gateway* bot);
 
-char* discord_send_raw(struct discord_bot* bot, const char* channel_id, const char* raw_json);
+gateway_event* gateway_receive_event(discord_gateway* bot);
 
-char* discord_send_message(struct discord_bot* bot, const char* channel, const char* content);
+void gateway_free_event(gateway_event* event);
 
-char* discord_send_embed(struct discord_bot* bot, const char* channel, const char* title, const char* description, const int color_hex);
-
-struct discord_event* discord_receive_event(struct discord_bot* bot);
-
-void discord_free_event(struct discord_event* event);
-
-void discord_cleanup(struct discord_bot* bot);
+void gateway_cleanup(discord_gateway* bot);
 
 #endif

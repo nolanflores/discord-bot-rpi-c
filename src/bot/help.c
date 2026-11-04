@@ -1,6 +1,6 @@
 #include "bot/help.h"
 
-char* help_command(struct discord_bot* bot, const char* channel_id){
+char* help_command(discord_rest* rest, const char* channel_id){
     char *help_payload = "{"
         "\"embeds\": [{"
             "\"title\": \"Command Help\","
@@ -24,10 +24,10 @@ char* help_command(struct discord_bot* bot, const char* channel_id){
             "\"footer\": {\"text\": \"!help hd2 - !help info\"}"
         "}]"
     "}";
-    return discord_send_raw(bot, channel_id, help_payload);
+    return rest_send_json(rest, channel_id, help_payload);
 }
 
-char* help_helldivers(struct discord_bot* bot, const char* channel_id){
+char* help_helldivers(discord_rest* rest, const char* channel_id){
     char *help_hd2_payload = "{"
         "\"embeds\": [{"
             "\"title\": \"Helldivers 2\","
@@ -46,10 +46,10 @@ char* help_helldivers(struct discord_bot* bot, const char* channel_id){
             "\"footer\": {\"text\": \"Data pulled live from the Helldivers 2 API\"}"
         "}]"
     "}";
-    return discord_send_raw(bot, channel_id, help_hd2_payload);
+    return rest_send_json(rest, channel_id, help_hd2_payload);
 }
 
-char* help_info(struct discord_bot* bot, const char* channel_id){
+char* help_info(discord_rest* rest, const char* channel_id){
     char *help_info_payload = "{"
         "\"embeds\": [{"
             "\"title\": \"Bot Info\","
@@ -67,5 +67,5 @@ char* help_info(struct discord_bot* bot, const char* channel_id){
             "]"
         "}]"
     "}";
-    return discord_send_raw(bot, channel_id, help_info_payload);
+    return rest_send_json(rest, channel_id, help_info_payload);
 }

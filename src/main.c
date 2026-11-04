@@ -1,6 +1,7 @@
-#include "core/discord.h"
+#include "discord/discord_gateway.h"
+#include "discord/discord_rest.h"
+#include "discord/token.h"
 #include "bot/commands.h"
-#include "core/token.h"
 #include <locale.h>
 
 int main(){
@@ -8,31 +9,38 @@ int main(){
     setlocale(LC_NUMERIC, "");
     https_ctx_init();
 
-    struct discord_bot bot;
-    if(discord_init(&bot)){
+    discord_rest rest;
+    if(rest_connect(&rest)){
+        https_ctx_free();
+        return 1;
+    }
+    discord_gateway gw;
+    if(gateway_init(&gw)){
+        rest_disconnect(&rest);
         https_ctx_free();
         return 1;
     }
 
     while(1){
-        struct discord_event* event = discord_receive_event(&bot);
+        gateway_event* event = gateway_receive_event(&gw);
         if(!event){
             fprintf(stderr, "Failed to receive event\n");
             break;
         }
         if(event->type == MESSAGE_CREATE){
             if(event->content[0] == '!'){
-                handle_command(&bot, event->channel_id, event->content);
+                handle_command(&rest, event->channel_id, event->content);
             }
         }else if(event->type == CLOSE_CONNECTION){
-            discord_free_event(event);
+            gateway_free_event(event);
             fprintf(stderr, "Connection closed\n");
             break;
         }
-        discord_free_event(event);
+        gateway_free_event(event);
     }
 
-    discord_cleanup(&bot);
+    gateway_cleanup(&gw);
+    rest_disconnect(&rest);
     https_ctx_free();
     return 0;
 }
