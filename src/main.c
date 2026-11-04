@@ -1,20 +1,16 @@
 #include "discord/discord_gateway.h"
 #include "discord/discord_rest.h"
-#include "discord/token.h"
-#include "bot/commands.h"
+#include "discord/token_loader.h"
 #include "core/plugin_loader.h"
+#include "bot/commands.h"
 #include <locale.h>
-
-#ifndef PLUGIN_DIRECTORY
-#define PLUGIN_DIRECTORY "./plugins"
-#endif
 
 int main(){
     load_token();
     setlocale(LC_NUMERIC, "");
     https_ctx_init();
 
-    plugin_loader_load(PLUGIN_DIRECTORY);
+    plugin_loader_load();
 
     discord_rest rest;
     if(rest_connect(&rest)){

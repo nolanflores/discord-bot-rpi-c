@@ -1,5 +1,5 @@
 #include "discord/discord_rest.h"
-#include "discord/token.h"
+#include "discord/token_loader.h"
 
 int rest_connect(discord_rest* rest){
     return https_connect(&rest->socket, "discord.com", "443");

@@ -1,3 +1,7 @@
+#ifndef PLUGIN_DIRECTORY
+#error "PLUGIN_DIRECTORY is not defined"
+#endif
+
 #include "core/plugin_loader.h"
 #include <dirent.h>
 #include <dlfcn.h>
@@ -13,10 +17,10 @@ typedef struct loaded_plugin{
 static loaded_plugin* loaded_plugins;
 static size_t loaded_plugin_count;
 
-int plugin_loader_load(const char* directory){
-    DIR* dir = opendir(directory);
+int plugin_loader_load(void){
+    DIR* dir = opendir(PLUGIN_DIRECTORY);
     if(dir == NULL){
-        fprintf(stderr, "Unable to open plugin directory '%s'\n", directory);
+        fprintf(stderr, "Unable to open plugin directory '%s'\n", PLUGIN_DIRECTORY);
         return 1;
     }
 
@@ -27,7 +31,7 @@ int plugin_loader_load(const char* directory){
             continue;
 
         char path[4096];
-        int length = snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
+        int length = snprintf(path, sizeof(path), "%s/%s", PLUGIN_DIRECTORY, entry->d_name);
         if(length < 0 || (size_t)length >= sizeof(path)){
             fprintf(stderr, "Plugin path is too long: %s\n", entry->d_name);
             result = 1;

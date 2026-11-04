@@ -2,7 +2,7 @@
 #error "TOKEN_PATH is not defined"
 #endif
 
-#include "discord/token.h"
+#include "discord/token_loader.h"
 #include <stdio.h>
 
 static char token[128];

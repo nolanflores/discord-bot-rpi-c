@@ -3,7 +3,7 @@
 
 #include "bot/plugin.h"
 
-int plugin_loader_load(const char* directory);
+int plugin_loader_load(void);
 
 int plugin_loader_handle_command(
     discord_rest* rest,
