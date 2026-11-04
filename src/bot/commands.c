@@ -28,7 +28,7 @@ static int djb2_hash(const char* command, const char** args){
     return hash;
 }
 
-int handle_command(struct discord_bot* bot, const char* channel_id, const char* content){
+int handle_command(discord_rest* rest, const char* channel_id, const char* content){
     const char* args = NULL;
     content++;//skip '!' prefix
     int hash = djb2_hash(content, &args);
@@ -37,69 +37,69 @@ int handle_command(struct discord_bot* bot, const char* channel_id, const char* 
     switch(hash){
         //GIFS
         case CMD_SELL:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/say-what-gif-7766983");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/say-what-gif-7766983");
             break;
         case CMD_BUDDY:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/hey-buddy-you-have-to-be-quiet-people-don%27t-like-you-hey-buddy-you-have-to-be-quiet-because-hey-buddy-you-have-to-be-quiet-because-people-don%27t-like-you-gif-3338348331317023398");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/hey-buddy-you-have-to-be-quiet-people-don%27t-like-you-hey-buddy-you-have-to-be-quiet-because-hey-buddy-you-have-to-be-quiet-because-people-don%27t-like-you-gif-3338348331317023398");
             break;
         case CMD_SOLD:
-            response = discord_send_message(bot, channel_id, "https://cdn.discordapp.com/attachments/945070791949709362/1406421859397795840/IMG_4698.gif");
+            response = rest_send_text(rest, channel_id, "https://cdn.discordapp.com/attachments/945070791949709362/1406421859397795840/IMG_4698.gif");
             break;
         case CMD_BUST:
-            response = discord_send_message(bot, channel_id, "https://media.discordapp.net/attachments/945070791949709362/1146307918447255552/bust.gif");
+            response = rest_send_text(rest, channel_id, "https://media.discordapp.net/attachments/945070791949709362/1146307918447255552/bust.gif");
             break;
         case CMD_SLAP:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/nic-cage-nicolas-cage-slap-mom-and-dad-inhale-gif-22714577");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/nic-cage-nicolas-cage-slap-mom-and-dad-inhale-gif-22714577");
             break;
         case CMD_REACT:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/soldier-soldier-tf2-tf2-soldier-gaming-gif-5369387296864231941");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/soldier-soldier-tf2-tf2-soldier-gaming-gif-5369387296864231941");
             break;
         case CMD_PRAY:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/collusion-trump-jabba-the-hut-gif-13001238");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/collusion-trump-jabba-the-hut-gif-13001238");
             break;
         case CMD_WHIP:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/whipping-johnny-rico-gif-19817777");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/whipping-johnny-rico-gif-19817777");
             break;
         case CMD_TAP:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/nemo-tap-glass-hello-gif-15153530");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/nemo-tap-glass-hello-gif-15153530");
             break;
         case CMD_NUKE:
-            response = discord_send_message(bot, channel_id, "https://cdn.discordapp.com/attachments/945070791949709362/1389203749565890600/Yapyap.gif");
+            response = rest_send_text(rest, channel_id, "https://cdn.discordapp.com/attachments/945070791949709362/1389203749565890600/Yapyap.gif");
             break;
         case CMD_NOTICE:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/brendan-frasier-oscars-meme-glasses-gif-17794317351170463418");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/brendan-frasier-oscars-meme-glasses-gif-17794317351170463418");
             break;
         case CMD_WINNER:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/epic-win-gif-18390652");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/epic-win-gif-18390652");
             break;
         case CMD_TOSS:
-            response = discord_send_message(bot, channel_id, "https://tenor.com/view/game-of-thrones-little-finger-petyr-baelish-baelish-drop-gif-4018898");
+            response = rest_send_text(rest, channel_id, "https://tenor.com/view/game-of-thrones-little-finger-petyr-baelish-baelish-drop-gif-4018898");
             break;
         //Plain text
         case CMD_VERSION:
-            response = discord_send_message(bot, channel_id, "Discord Bot GNU C11 Edition");
+            response = rest_send_text(rest, channel_id, "Discord Bot GNU C11 Edition");
             break;
         case CMD_REPO:
-            response = discord_send_message(bot, channel_id, "https://github.com/nolanflores/discord-bot-rpi-c");
+            response = rest_send_text(rest, channel_id, "https://github.com/nolanflores/discord-bot-rpi-c");
             break;
         case CMD_HELP:
             if(args == NULL)
-                response = help_command(bot, channel_id);
+                response = help_command(rest, channel_id);
             else if(strcmp(args, "hd2") == 0)
-                response = help_helldivers(bot, channel_id);
+                response = help_helldivers(rest, channel_id);
             else if(strcmp(args, "info") == 0)
-                response = help_info(bot, channel_id);
+                response = help_info(rest, channel_id);
             break;
         //Commands with https requests
         case CMD_MO:
-            response = helldivers_major_order(bot, channel_id);
+            response = helldivers_major_order(rest, channel_id);
             break;
         case CMD_WAR:
-            response = helldivers_war_summary(bot, channel_id);
+            response = helldivers_war_summary(rest, channel_id);
             break;
         case CMD_CYBERSTAN:
-            //response = helldivers_cyberstan(bot, channel_id);
-            response = discord_send_message(bot, channel_id, "It's Joe Over.");
+            //response = helldivers_cyberstan(rest, channel_id);
+            response = rest_send_text(rest, channel_id, "It's Joe Over.");
             break;
         default:
             return 0;

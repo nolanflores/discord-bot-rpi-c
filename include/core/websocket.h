@@ -9,9 +9,9 @@
  * This structure is a wrapper for the underlying https_socket,
  * and exists to prevent passing an upgraded socket to https functions.
  */
-struct websocket{
-    struct https_socket https_sock;
-};
+typedef struct websocket{
+    https_socket https_sock;
+}websocket;
 
 /*
 * Represents a received WebSocket message.
@@ -20,11 +20,11 @@ struct websocket{
 * payload: The message payload as a null-terminated string.
 * payload_len: The length of the payload in bytes.
 */
-struct ws_message{
+typedef struct ws_message{
     int opcode;
     char* payload;
     size_t payload_len;
-};
+}ws_message;
 
 /*
  * Establishes a TCP/TLS socket connection.
@@ -35,7 +35,7 @@ struct ws_message{
  * 
  * Returns 0 on success, 1 on failure.
  */
-int ws_connect(struct websocket* ws, const char* hostname, const char* port);
+int ws_connect(websocket* ws, const char* hostname, const char* port);
 
 /*
  * Sends a text websocket frame (opcode 1) with the given message.
@@ -45,7 +45,7 @@ int ws_connect(struct websocket* ws, const char* hostname, const char* port);
  *
  * Returns 0 on success, 1 on failure.
  */
-int ws_send_text(struct websocket* ws, const char* message);
+int ws_send_text(websocket* ws, const char* message);
 
 /*
  * Receives a websocket frame and returns the payload as a null-terminated string.
@@ -53,18 +53,18 @@ int ws_send_text(struct websocket* ws, const char* message);
  * 
  * Returns NULL if a close frame is received, or if reading fails.
  */
-struct ws_message* ws_receive(struct websocket* ws);
+ws_message* ws_receive(websocket* ws);
 
 /*
  * Sends a WebSocket close frame (opcode 8) to the server.
  * Closes the TLS connection and TCP socket.
  */
-void ws_close(struct websocket* ws);
+void ws_close(websocket* ws);
 
 /*
  * Frees a ws_message structure.
  * Also frees the member payload.
  */
-void ws_free_message(struct ws_message* msg);
+void ws_free_message(ws_message* msg);
 
 #endif
