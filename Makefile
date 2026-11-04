@@ -6,14 +6,16 @@ IMAGE  := discord_bot
 DOCKER := docker
 
 SRCS := src/main.c $(wildcard src/core/*.c) $(wildcard src/bot/*.c) $(wildcard src/discord/*.c)
+PLUGIN_SRCS := $(wildcard plugins/*.c)
 
-BUILD := build/$(MODE)
-BIN   := $(BUILD)/$(TARGET)
+BUILD := build
+BIN   := $(TARGET)
 OBJS  := $(SRCS:%.c=$(BUILD)/%.o)
 DEPS  := $(OBJS:.o=.d)
+PLUGIN_BINS := $(PLUGIN_SRCS:plugins/%.c=$(BUILD)/plugins/%.so)
 
-CFLAGS  := -std=gnu11 -Wall -Wextra -I include -I .
-LDLIBS  := -lssl -lcrypto
+CFLAGS  := -std=gnu11 -Wall -Wextra -I include -I . -DPLUGIN_DIRECTORY='"$(BUILD)/plugins"'
+LDLIBS  := -lssl -lcrypto -ldl
 
 RELEASE_TOKEN := /run/secrets/discord_token
 LOCAL_TOKEN   := ./test/discord_token.txt
@@ -31,8 +33,7 @@ endif
 
 .PHONY: all debug pi release clean
 
-all: $(BIN)
-	cp $(BIN) $(TARGET)
+all: $(BIN) plugins
 
 debug:
 	$(MAKE) MODE=debug all
@@ -44,7 +45,13 @@ release:
 	$(DOCKER) build -t $(IMAGE) .
 
 $(BIN): $(OBJS)
-	$(CC) $(OBJS) -o $@ $(LDLIBS)
+	$(CC) $(OBJS) -o $@ -rdynamic $(LDLIBS)
+
+plugins: $(PLUGIN_BINS)
+
+$(BUILD)/plugins/%.so: plugins/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -shared $< -o $@
 
 # -MMD -MP generates .d files so header changes trigger rebuilds
 $(BUILD)/%.o: %.c

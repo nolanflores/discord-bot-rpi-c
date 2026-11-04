@@ -5,6 +5,7 @@ RUN apt-get update \
 WORKDIR /src
 COPY Makefile ./
 COPY include/ include/
+COPY plugins/ plugins/
 COPY src/ src/
 RUN make MODE=release all
 
@@ -14,5 +15,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --no-create-home bot
 COPY --from=build /src/run /usr/local/bin/run
+WORKDIR /app
+COPY --from=build /src/build/plugins/ /app/build/plugins/
 USER bot
 ENTRYPOINT ["/usr/local/bin/run"]

@@ -2,21 +2,30 @@
 #include "discord/discord_rest.h"
 #include "discord/token.h"
 #include "bot/commands.h"
+#include "core/plugin_loader.h"
 #include <locale.h>
+
+#ifndef PLUGIN_DIRECTORY
+#define PLUGIN_DIRECTORY "./plugins"
+#endif
 
 int main(){
     load_token();
     setlocale(LC_NUMERIC, "");
     https_ctx_init();
 
+    plugin_loader_load(PLUGIN_DIRECTORY);
+
     discord_rest rest;
     if(rest_connect(&rest)){
+        plugin_loader_unload();
         https_ctx_free();
         return 1;
     }
     discord_gateway gw;
     if(gateway_init(&gw)){
         rest_disconnect(&rest);
+        plugin_loader_unload();
         https_ctx_free();
         return 1;
     }
@@ -41,6 +50,7 @@ int main(){
 
     gateway_cleanup(&gw);
     rest_disconnect(&rest);
+    plugin_loader_unload();
     https_ctx_free();
     return 0;
 }

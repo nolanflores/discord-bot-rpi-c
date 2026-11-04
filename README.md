@@ -59,6 +59,12 @@ This bot can either be run straight as an executable binary or as a Docker image
 
 Compile the binary with the makefile, the resulting binary "run" is the Discord bot. You can run that executable directly, or you can use something like systemd to restart the process on failure.
 
+### Plugins
+
+At startup, the bot loads every plugin file from `build/plugins`. Plugins can
+add commands without changing the bot executable. The plugin API is defined in
+`include/bot/plugin.h`.
+
 ### Docker
 
 - Install Docker ([instructions can be found here](https://docs.docker.com/desktop/setup/install/linux/))

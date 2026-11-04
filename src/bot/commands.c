@@ -1,6 +1,8 @@
 #include "bot/commands.h"
 #include "bot/helldivers.h"
 #include "bot/help.h"
+#include "core/plugin_loader.h"
+#include <string.h>
 
 enum command_hashes{
     CMD_SELL = 2090720021, CMD_BUDDY = 254689437, CMD_SOLD = 2090730903,
@@ -32,6 +34,9 @@ int handle_command(discord_rest* rest, const char* channel_id, const char* conte
     const char* args = NULL;
     content++;//skip '!' prefix
     int hash = djb2_hash(content, &args);
+    int plugin_result = plugin_loader_handle_command(rest, channel_id, hash, args);
+    if(plugin_result >= 0)
+        return plugin_result;
 
     char* response = NULL;
     switch(hash){
