@@ -14,7 +14,7 @@ OBJS  := $(SRCS:%.c=$(BUILD)/%.o)
 DEPS  := $(OBJS:.o=.d)
 PLUGIN_BINS := $(PLUGIN_SRCS:plugins/%.c=$(BUILD)/plugins/%.so)
 
-CFLAGS  := -std=gnu11 -Wall -Wextra -I include -I . -DPLUGIN_DIRECTORY='"$(BUILD)/plugins"'
+CFLAGS  := -std=gnu11 -Wall -Wextra -I include -DPLUGIN_DIRECTORY='"$(BUILD)/plugins"'
 LDLIBS  := -lssl -lcrypto -ldl
 
 RELEASE_TOKEN := /run/secrets/discord_token
