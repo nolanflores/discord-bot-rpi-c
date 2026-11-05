@@ -1,10 +1,6 @@
 #include "bot/plugin.h"
 
-static char* helloworld_command(
-    discord_rest* rest,
-    const char* channel_id,
-    const char* args
-){
+static char* helloworld_command(discord_rest* rest, const char* channel_id, const char* args){
     (void)args;
     return rest_send_text(rest, channel_id, "Hello, world!");
 }
