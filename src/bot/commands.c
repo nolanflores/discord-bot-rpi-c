@@ -1,5 +1,4 @@
 #include "bot/commands.h"
-#include "bot/helldivers.h"
 #include "bot/help.h"
 #include "core/plugin_loader.h"
 #include <string.h>
