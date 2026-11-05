@@ -1,6 +1,7 @@
 #include "discord/discord_gateway.h"
 #include "discord/discord_rest.h"
-#include "discord/token.h"
+#include "discord/token_loader.h"
+#include "core/plugin_loader.h"
 #include "bot/commands.h"
 #include <locale.h>
 
@@ -9,14 +10,18 @@ int main(){
     setlocale(LC_NUMERIC, "");
     https_ctx_init();
 
+    plugin_loader_load();
+
     discord_rest rest;
     if(rest_connect(&rest)){
+        plugin_loader_unload();
         https_ctx_free();
         return 1;
     }
     discord_gateway gw;
     if(gateway_init(&gw)){
         rest_disconnect(&rest);
+        plugin_loader_unload();
         https_ctx_free();
         return 1;
     }
@@ -41,6 +46,7 @@ int main(){
 
     gateway_cleanup(&gw);
     rest_disconnect(&rest);
+    plugin_loader_unload();
     https_ctx_free();
     return 0;
 }

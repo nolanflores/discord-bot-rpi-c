@@ -5,8 +5,4 @@
 
 char* help_command(discord_rest* rest, const char* channel_id);
 
-char* help_helldivers(discord_rest* rest, const char* channel_id);
-
-char* help_info(discord_rest* rest, const char* channel_id);
-
 #endif
