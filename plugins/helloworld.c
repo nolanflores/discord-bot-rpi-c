@@ -11,7 +11,9 @@ static const bot_command commands[] = {
 
 static const bot_plugin plugin = {
     commands,
-    sizeof(commands) / sizeof(commands[0])
+    sizeof(commands) / sizeof(commands[0]),
+    "Hello World Plugin",
+    "A simple plugin that responds with 'Hello, world!' when the command is invoked."
 };
 
 const bot_plugin* bot_plugin_init(void){

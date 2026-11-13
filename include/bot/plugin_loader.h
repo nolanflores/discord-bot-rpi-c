@@ -5,12 +5,9 @@
 
 int plugin_loader_load(void);
 
-int plugin_loader_handle_command(
-    discord_rest* rest,
-    const char* channel_id,
-    int hash,
-    const char* args
-);
+int plugin_loader_handle_command(discord_rest* rest, const char* channel_id, int hash, const char* args);
+
+char* plugin_loader_help(discord_rest* rest, const char* channel_id);
 
 void plugin_loader_unload(void);
 

@@ -13,6 +13,8 @@ typedef struct bot_command{
 typedef struct bot_plugin{
     const bot_command* commands;
     size_t command_count;
+    const char* name;
+    const char* help;
 }bot_plugin;
 
 typedef const bot_plugin* (*bot_plugin_init_function)(void);

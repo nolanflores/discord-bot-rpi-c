@@ -100,6 +100,40 @@ int plugin_loader_handle_command(discord_rest* rest, const char* channel_id, int
     return -1;
 }
 
+char* plugin_loader_help(discord_rest* rest, const char* channel_id){
+    char help_message[65536];
+    size_t offset = snprintf(help_message, sizeof(help_message), 
+        "{"
+            "\"embeds\": [{"
+                "\"title\": \"Command Help\","
+                "\"description\": \"Use `!help <category>` for more info\","
+                "\"color\": 3894651,"
+                "\"fields\": ["
+                    "{"
+                        "\"name\": \"Bot Info\","
+                        "\"value\": \"`!version` `!repo`\","
+                        "\"inline\": false"
+                    "}"
+    );
+    for(size_t i = 0; i < loaded_plugin_count; ++i){
+        offset += snprintf(help_message + offset, sizeof(help_message) - offset,
+            ",{"
+                "\"name\": \"%s\","
+                "\"value\": \"%s\","
+                "\"inline\": false"
+            "}",
+            loaded_plugins[i].plugin->name,
+            loaded_plugins[i].plugin->help
+        );
+    }
+    snprintf(help_message + offset, sizeof(help_message) - offset,
+                  "]"
+            "}]"
+        "}"
+    );
+    return rest_send_json(rest, channel_id, help_message);
+}
+
 void plugin_loader_unload(void){
     for(size_t i = loaded_plugin_count; i > 0; --i)
         dlclose(loaded_plugins[i - 1].handle);

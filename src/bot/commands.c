@@ -39,7 +39,7 @@ int handle_command(discord_rest* rest, const char* channel_id, const char* conte
             response = rest_send_text(rest, channel_id, "https://github.com/nolanflores/discord-bot-rpi-c");
             break;
         case CMD_HELP:
-            response = help_command(rest, channel_id);
+            response = plugin_loader_help(rest, channel_id);
             break;
         default:
             return 0;
