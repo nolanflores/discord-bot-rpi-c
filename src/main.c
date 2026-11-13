@@ -1,7 +1,7 @@
 #include "discord/discord_gateway.h"
 #include "discord/discord_rest.h"
 #include "discord/token_loader.h"
-#include "core/plugin_loader.h"
+#include "bot/plugin_loader.h"
 #include "bot/commands.h"
 #include <locale.h>
 

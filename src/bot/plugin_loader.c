@@ -2,7 +2,7 @@
 #error "PLUGIN_DIRECTORY is not defined"
 #endif
 
-#include "core/plugin_loader.h"
+#include "bot/plugin_loader.h"
 #include <dirent.h>
 #include <dlfcn.h>
 #include <stdio.h>

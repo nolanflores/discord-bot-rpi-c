@@ -1,6 +1,6 @@
 #include "bot/commands.h"
 #include "bot/help.h"
-#include "core/plugin_loader.h"
+#include "bot/plugin_loader.h"
 #include <string.h>
 
 enum command_hashes{
